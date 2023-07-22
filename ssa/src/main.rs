@@ -28,7 +28,7 @@ fn main() -> eyre::Result<()> {
     let input = std::fs::read(&args.input)
         .with_context(|| format!("Could not read file {}", args.input.display()))?;
 
-    let syn = ssa::ast::Syntax::from_bytes(&input)?;
+    let syn = ssa::syntax::Syntax::from_bytes(&input)?;
 
     dbg!(&syn);
 

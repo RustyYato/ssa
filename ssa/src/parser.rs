@@ -1,4 +1,4 @@
-use crate::ast;
+use crate::syntax::Syntax;
 
 pub struct Parser<'text> {
     text: &'text [u8],
@@ -51,7 +51,7 @@ impl core::fmt::Display for ParseError {
 
 type Result<T, E = ParseError> = std::result::Result<T, E>;
 
-pub fn parse(text: &[u8]) -> Result<ast::Syntax> {
+pub fn parse(text: &[u8]) -> Result<Syntax> {
     let mut parser = Parser::new(text);
 
     let syn = parser.parse()?;
@@ -118,13 +118,13 @@ impl<'text> Parser<'text> {
         Ok(istr::IBytes::new(word))
     }
 
-    fn parse(&mut self) -> Result<ast::Syntax> {
+    fn parse(&mut self) -> Result<Syntax> {
         self.parse_ws();
         match self.text {
             [b'(', rest @ ..] => {
                 self.text = rest;
 
-                let mut syn = ast::Syntax {
+                let mut syn = Syntax {
                     name: self.parse_word()?,
                     args: Vec::new(),
                 };
@@ -140,7 +140,7 @@ impl<'text> Parser<'text> {
                     syn.args.push(self.parse()?)
                 }
             }
-            _ => Ok(ast::Syntax {
+            _ => Ok(Syntax {
                 name: self.parse_word()?,
                 args: Vec::new(),
             }),
