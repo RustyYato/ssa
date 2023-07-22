@@ -3,14 +3,14 @@ use std::str::FromStr;
 pub use crate::parser::ParseError;
 
 pub struct Syntax {
-    pub name: istr::IBytes,
+    pub name: istr::IStr,
     pub args: Vec<Syntax>,
 }
 
 impl core::fmt::Debug for Syntax {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Syntax")
-            .field("name", &self.name())
+            .field("name", &self.name)
             .field("args", &self.args)
             .finish()
     }
@@ -28,9 +28,9 @@ impl Syntax {
             f.write_str("  ")?
         }
         if self.args.is_empty() {
-            write!(f, "{}", self.name())
+            write!(f, "{}", self.name)
         } else {
-            writeln!(f, "({}", self.name())?;
+            writeln!(f, "({}", self.name)?;
             let mut first = true;
             for arg in &self.args {
                 if first {
@@ -42,9 +42,6 @@ impl Syntax {
             }
             write!(f, ")")
         }
-    }
-    pub fn name(&self) -> &bstr::BStr {
-        bstr::BStr::new(self.name.to_bytes())
     }
 }
 

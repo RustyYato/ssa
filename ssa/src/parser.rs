@@ -82,7 +82,7 @@ impl<'text> Parser<'text> {
         self.text = bytes
     }
 
-    pub fn parse_word(&mut self) -> Result<istr::IBytes> {
+    pub fn parse_word(&mut self) -> Result<istr::IStr> {
         let mut bytes = self.text;
 
         if self.text.is_empty() {
@@ -115,7 +115,9 @@ impl<'text> Parser<'text> {
         let (word, rest) = self.text.split_at(index);
         self.text = rest;
 
-        Ok(istr::IBytes::new(word))
+        Ok(istr::IStr::new(unsafe {
+            core::str::from_utf8_unchecked(word)
+        }))
     }
 
     fn parse(&mut self) -> Result<Syntax> {

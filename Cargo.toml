@@ -20,9 +20,6 @@ features = ['std']
 [workspace.dependencies.eyre]
 version = '0.6'
 
-[workspace.dependencies.bstr]
-version = '1'
-
 [workspace.dependencies.colorz-eyre]
 git = "https://github.com/RustyYato/colorz-eyre.git"
 branch = "master"
