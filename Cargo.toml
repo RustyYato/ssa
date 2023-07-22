@@ -1,0 +1,32 @@
+
+[workspace]
+
+resolver = '2'
+
+members = [
+    'ssa',
+    'colorz-eyre',
+    'colorz-spantrace',
+]
+
+[workspace.dependencies.clap]
+version = '4'
+features = ['derive', 'env']
+
+[workspace.dependencies.colorz]
+version = '1.1.1'
+features = ['std']
+
+[workspace.dependencies.eyre]
+version = '0.6'
+
+[workspace.dependencies.bstr]
+version = '1'
+
+[workspace.dependencies.colorz-eyre]
+git = "https://github.com/RustyYato/colorz-eyre.git"
+branch = "master"
+
+[workspace.dependencies.istr]
+git = 'https://github.com/RustyYato/istr.git'
+branch = 'main'
