@@ -10,9 +10,41 @@ pub struct Syntax {
 impl core::fmt::Debug for Syntax {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Syntax")
-            .field("name", &bstr::BStr::new(self.name.to_bytes()))
+            .field("name", &self.name())
             .field("args", &self.args)
             .finish()
+    }
+}
+
+impl core::fmt::Display for Syntax {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_display(0, f)
+    }
+}
+
+impl Syntax {
+    fn fmt_display(&self, depth: u32, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for _ in 0..depth {
+            f.write_str("  ")?
+        }
+        if self.args.is_empty() {
+            write!(f, "{}", self.name())
+        } else {
+            writeln!(f, "({}", self.name())?;
+            let mut first = true;
+            for arg in &self.args {
+                if first {
+                    first = false;
+                } else {
+                    f.write_str("\n")?
+                }
+                arg.fmt_display(depth + 1, f)?;
+            }
+            write!(f, ")")
+        }
+    }
+    pub fn name(&self) -> &bstr::BStr {
+        bstr::BStr::new(self.name.to_bytes())
     }
 }
 

@@ -30,7 +30,9 @@ fn main() -> eyre::Result<()> {
 
     let syn = ssa::ast::Syntax::from_bytes(&input)?;
 
-    dbg!(syn);
+    dbg!(&syn);
+
+    println!("{syn}");
 
     Ok(())
 }
