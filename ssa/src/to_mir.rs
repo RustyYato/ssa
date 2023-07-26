@@ -44,6 +44,7 @@ struct ScopeContext<'a> {
 
 #[derive(Clone, Copy, Debug)]
 struct ScopeList<'a> {
+    #[cfg(debug_assertions)]
     kind: &'static str,
     id: name_resolver::ScopeRef<'a>,
     after_last_loop: Option<name_resolver::ScopeRef<'a>>,
@@ -72,6 +73,7 @@ impl<'a> ScopeContext<'a> {
         ScopeContext {
             bb: self.bb,
             scopes: ScopeList {
+                #[cfg(debug_assertions)]
                 kind: "loop",
                 id: scope,
                 prev: Some(&self.scopes),
@@ -85,6 +87,7 @@ impl<'a> ScopeContext<'a> {
         ScopeContext {
             bb: self.bb,
             scopes: ScopeList {
+                #[cfg(debug_assertions)]
                 kind: "block",
                 id: scope,
                 prev: Some(&self.scopes),
@@ -110,6 +113,7 @@ impl Encoder {
 
         let scope = self.nr.scope();
         let scopes = ScopeList {
+            #[cfg(debug_assertions)]
             kind: "root",
             id: scope.as_ref(),
             prev: None,
@@ -159,7 +163,7 @@ impl Encoder {
                 [ident] => {
                     if ident.args.is_empty() {
                         let reg = self.nr.define(ident.name, &mut self.regs);
-                        // bb.instrs.push(mir::Instr::StartLifetime(reg));
+                        ctx.bb.instrs.push(mir::Instr::StartLifetime(reg));
                     } else {
                         todo!()
                     }
