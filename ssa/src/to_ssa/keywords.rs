@@ -25,6 +25,7 @@ pub enum Keyword {
     Input,
     Print,
     Add,
+    Eq,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -49,6 +50,7 @@ impl Keywords {
                     (IStr::new("input"), Keyword::Input),
                     (IStr::new("print"), Keyword::Print),
                     (IStr::new("+"), Keyword::Add),
+                    (IStr::new("="), Keyword::Eq),
                 ]),
             })
         });

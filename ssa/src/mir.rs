@@ -1,16 +1,22 @@
-use std::num::NonZeroU32;
+use std::{collections::HashMap, num::NonZeroU32};
 
+#[derive(Debug)]
 pub struct Mir {
     blocks: Vec<BasicBlock>,
 }
 
+#[derive(Debug)]
 pub struct MirBuilder {
     next_id: u32,
+    blocks: HashMap<BasicBlockId, BasicBlock>,
 }
 
 impl MirBuilder {
     pub fn new() -> Self {
-        Self { next_id: 0 }
+        Self {
+            next_id: 0,
+            blocks: HashMap::default(),
+        }
     }
 
     pub fn new_block(&mut self) -> (BasicBlockId, BasicBlockBuilder) {
@@ -20,10 +26,35 @@ impl MirBuilder {
         (
             BasicBlockId(id),
             BasicBlockBuilder {
+                id: BasicBlockId(id),
                 args: Vec::new(),
                 instrs: Vec::new(),
             },
         )
+    }
+
+    pub fn commit(&mut self, bb: BasicBlockBuilder, term: Terminator) {
+        self.blocks.insert(
+            bb.id,
+            BasicBlock {
+                id: bb.id,
+                args: bb.args,
+                instrs: bb.instrs,
+                term,
+            },
+        );
+    }
+
+    pub fn finish(mut self) -> Mir {
+        let mut blocks = Vec::new();
+        for i in 0..self.next_id {
+            blocks.push(
+                self.blocks
+                    .remove(&BasicBlockId(NonZeroU32::new(i + 1).unwrap()))
+                    .unwrap(),
+            )
+        }
+        Mir { blocks }
     }
 }
 
@@ -35,12 +66,14 @@ impl Default for MirBuilder {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BasicBlockBuilder {
+    id: BasicBlockId,
     pub args: Vec<Reg>,
     pub instrs: Vec<Instr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BasicBlock {
+    id: BasicBlockId,
     args: Vec<Reg>,
     instrs: Vec<Instr>,
     term: Terminator,
@@ -64,6 +97,7 @@ pub enum Instr {
     Mul { dest: Reg, left: Val, right: Val },
     Sub { dest: Reg, left: Val, right: Val },
     Div { dest: Reg, left: Val, right: Val },
+    CmpEq { dest: Reg, left: Val, right: Val },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -135,4 +169,13 @@ pub enum Terminator {
         if_false: BasicBlockRef,
     },
     ProgramExit,
+}
+
+impl BasicBlockRef {
+    pub fn new(id: BasicBlockId) -> Self {
+        Self {
+            id,
+            args: Vec::new(),
+        }
+    }
 }
