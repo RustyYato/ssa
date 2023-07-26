@@ -33,7 +33,7 @@ fn main() -> eyre::Result<()> {
     dbg!(&syn);
     println!("{syn}");
 
-    let enc = ssa::to_ssa::Encoder::new();
+    let enc = ssa::to_mir::Encoder::new();
     let mir = enc.encode(&syn)?;
 
     dbg!(mir);
