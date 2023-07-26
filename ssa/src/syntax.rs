@@ -29,8 +29,13 @@ impl Syntax {
         }
         match self.args.len() {
             0 => write!(f, "{}", self.name),
-            1 if self.args[0].args.is_empty() => {
-                write!(f, "({} {})", self.name, self.args[0].name)
+            _ if self.args.iter().all(|arg| arg.args.is_empty()) => {
+                write!(f, "({}", self.name)?;
+                for arg in &self.args {
+                    f.write_str(" ")?;
+                    arg.fmt_display(0, f)?;
+                }
+                write!(f, ")")
             }
             _ => {
                 writeln!(f, "({}", self.name)?;
