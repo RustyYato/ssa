@@ -268,6 +268,26 @@ impl Encoder {
 
                 Ok(())
             }
+            Some(keywords::Keyword::Continue) => {
+                let (loop_start, _loop_end, _loop_scope) = ctx
+                    .scopes
+                    .current_loop
+                    .ok_or(EncodingError::BreakOutOfLoop)?;
+
+                let (_, after_break) = self.mir.new_block();
+
+                let before_break = core::mem::replace(ctx.bb, after_break);
+
+                if let Some(scope) = ctx.scopes.after_last_loop {
+                    self.exit_scope(ctx, scope);
+                }
+                self.mir.commit(
+                    before_break,
+                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_start)),
+                );
+
+                Ok(())
+            }
             Some(keywords::Keyword::If) => {
                 let (cond, if_true, if_false) = match syn.args.as_slice() {
                     [cond, if_true] => (cond, if_true, None),
