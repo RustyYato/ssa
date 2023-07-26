@@ -256,11 +256,12 @@ impl Encoder {
 
                 let (_, after_break) = self.mir.new_block();
 
+                if let Some(scope) = ctx.scopes.after_last_loop {
+                    self.exit_scope(ctx.by_ref(), scope);
+                }
+
                 let before_break = core::mem::replace(ctx.bb, after_break);
 
-                if let Some(scope) = ctx.scopes.after_last_loop {
-                    self.exit_scope(ctx, scope);
-                }
                 self.mir.commit(
                     before_break,
                     mir::Terminator::Jump(mir::BasicBlockRef::new(loop_end)),
