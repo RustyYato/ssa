@@ -31,8 +31,10 @@ fn main() -> eyre::Result<()> {
     let syn = ssa::syntax::Syntax::from_bytes(&input)?;
 
     dbg!(&syn);
-
     println!("{syn}");
+
+    let mut enc = ssa::to_ssa::Encoder::new();
+    enc.encode(&syn)?;
 
     Ok(())
 }
