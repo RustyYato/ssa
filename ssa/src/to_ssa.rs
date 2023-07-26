@@ -24,6 +24,7 @@ pub enum EncodingError {
     MissingArgsForSet,
     MissingArgsForLet,
     TooManyArgsForLet,
+    BreakOutOfLoop,
 }
 
 impl std::error::Error for EncodingError {}
@@ -34,6 +35,65 @@ impl core::fmt::Display for EncodingError {
 }
 
 type Result<T, E = EncodingError> = std::result::Result<T, E>;
+
+#[derive(Debug)]
+struct ScopeContext<'a> {
+    bb: &'a mut BasicBlockBuilder,
+    scopes: ScopeList<'a>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ScopeList<'a> {
+    kind: &'static str,
+    id: name_resolver::ScopeRef<'a>,
+    after_last_loop: Option<name_resolver::ScopeRef<'a>>,
+    current_loop: Option<(
+        mir::BasicBlockId,
+        mir::BasicBlockId,
+        name_resolver::ScopeRef<'a>,
+    )>,
+    prev: Option<&'a ScopeList<'a>>,
+}
+
+impl<'a> ScopeContext<'a> {
+    pub fn by_ref(&mut self) -> ScopeContext<'_> {
+        ScopeContext {
+            bb: self.bb,
+            ..*self
+        }
+    }
+
+    pub fn loop_scope<'b>(
+        &'b mut self,
+        loop_start: mir::BasicBlockId,
+        loop_end: mir::BasicBlockId,
+        scope: name_resolver::ScopeRef<'b>,
+    ) -> ScopeContext<'_> {
+        ScopeContext {
+            bb: self.bb,
+            scopes: ScopeList {
+                kind: "loop",
+                id: scope,
+                prev: Some(&self.scopes),
+                after_last_loop: None,
+                current_loop: Some((loop_start, loop_end, scope)),
+            },
+        }
+    }
+
+    pub fn block_scope<'b>(&'b mut self, scope: name_resolver::ScopeRef<'b>) -> ScopeContext<'_> {
+        ScopeContext {
+            bb: self.bb,
+            scopes: ScopeList {
+                kind: "block",
+                id: scope,
+                prev: Some(&self.scopes),
+                after_last_loop: Some(self.scopes.after_last_loop.unwrap_or(scope)),
+                current_loop: self.scopes.current_loop,
+            },
+        }
+    }
+}
 
 impl Encoder {
     pub fn new() -> Self {
@@ -48,13 +108,52 @@ impl Encoder {
     pub fn encode(mut self, syn: &Syntax) -> Result<mir::Mir> {
         let (_id, mut block) = self.mir.new_block();
 
-        self.write_statement(syn, &mut block)?;
+        let scope = self.nr.scope();
+        let scopes = ScopeList {
+            kind: "root",
+            id: scope.as_ref(),
+            prev: None,
+            after_last_loop: None,
+            current_loop: None,
+        };
+        self.write_statement(
+            syn,
+            ScopeContext {
+                bb: &mut block,
+                scopes,
+            },
+        )?;
+        self.close_scope_unchecked(&mut block, scope);
         self.mir.commit(block, mir::Terminator::ProgramExit);
 
         Ok(self.mir.finish())
     }
 
-    fn write_statement(&mut self, syn: &Syntax, bb: &mut BasicBlockBuilder) -> Result<()> {
+    fn close_scope_unchecked(
+        &mut self,
+        bb: &mut mir::BasicBlockBuilder,
+        scope: name_resolver::ScopeToken,
+    ) {
+        let vars = self.nr.close_scope_with(scope);
+
+        for var in vars {
+            bb.instrs.push(mir::Instr::EndLifetime(var));
+        }
+    }
+
+    fn close_scope(&mut self, ctx: ScopeContext<'_>, scope: name_resolver::ScopeToken) {
+        self.close_scope_unchecked(ctx.bb, scope);
+    }
+
+    fn exit_scope(&mut self, ctx: ScopeContext<'_>, scope: name_resolver::ScopeRef<'_>) {
+        let vars = self.nr.scope_bindings(ctx.scopes.id);
+
+        for var in vars {
+            ctx.bb.instrs.push(mir::Instr::EndLifetime(var));
+        }
+    }
+
+    fn write_statement(&mut self, syn: &Syntax, mut ctx: ScopeContext<'_>) -> Result<()> {
         match self.keywords.get(syn.name) {
             Some(keywords::Keyword::Let) => match syn.args.as_slice() {
                 [ident] => {
@@ -77,8 +176,8 @@ impl Encoder {
                 [ident, value] => {
                     if ident.args.is_empty() {
                         let reg = self.nr.resolve(ident.name)?;
-                        let val = self.write_expr(value, bb)?;
-                        bb.instrs.push(mir::Instr::Store { dest: reg, val });
+                        let val = self.write_expr(value, ctx.by_ref())?;
+                        ctx.bb.instrs.push(mir::Instr::Store { dest: reg, val });
                     } else {
                         todo!()
                     }
@@ -90,8 +189,8 @@ impl Encoder {
 
             Some(keywords::Keyword::Print) => match syn.args.as_slice() {
                 [arg] => {
-                    let val = self.write_expr(arg, bb)?;
-                    bb.instrs.push(crate::mir::Instr::ConsolePrint(val));
+                    let val = self.write_expr(arg, ctx.by_ref())?;
+                    ctx.bb.instrs.push(crate::mir::Instr::ConsolePrint(val));
                     Ok(())
                 }
                 [] => Err(EncodingError::MissingArgsForPrint),
@@ -101,7 +200,7 @@ impl Encoder {
                 [ident] => {
                     if ident.args.is_empty() {
                         let reg = self.nr.resolve(ident.name)?;
-                        bb.instrs.push(crate::mir::Instr::ConsoleInput(reg));
+                        ctx.bb.instrs.push(crate::mir::Instr::ConsoleInput(reg));
                     } else {
                         todo!()
                     }
@@ -112,13 +211,57 @@ impl Encoder {
             },
             Some(keywords::Keyword::Block) => {
                 let scope = self.nr.scope();
+                let mut block_ctx = ctx.block_scope(scope.as_ref());
                 for arg in syn.args.as_slice() {
-                    self.write_statement(arg, bb)?;
+                    self.write_statement(arg, block_ctx.by_ref())?;
                 }
-                self.nr.close_scope(scope);
-                // for reg in regs {
-                //     bb.instrs.push(mir::Instr::EndLifetime(reg));
-                // }
+                self.close_scope(ctx, scope);
+                Ok(())
+            }
+            Some(keywords::Keyword::Loop) => {
+                let (loop_id, loop_block) = self.mir.new_block();
+                let (after_loop_id, after_loop_block) = self.mir.new_block();
+
+                let before_loop = core::mem::replace(ctx.bb, loop_block);
+                self.mir.commit(
+                    before_loop,
+                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_id)),
+                );
+
+                let scope = self.nr.scope();
+                let mut loop_ctx = ctx.loop_scope(loop_id, after_loop_id, scope.as_ref());
+                for arg in syn.args.as_slice() {
+                    self.write_statement(arg, loop_ctx.by_ref())?;
+                }
+
+                let loop_block = core::mem::replace(ctx.bb, after_loop_block);
+
+                self.close_scope(ctx, scope);
+                self.mir.commit(
+                    loop_block,
+                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_id)),
+                );
+
+                Ok(())
+            }
+            Some(keywords::Keyword::Break) => {
+                let (_loop_start, loop_end, _loop_scope) = ctx
+                    .scopes
+                    .current_loop
+                    .ok_or(EncodingError::BreakOutOfLoop)?;
+
+                let (_, after_break) = self.mir.new_block();
+
+                let before_break = core::mem::replace(ctx.bb, after_break);
+
+                if let Some(scope) = ctx.scopes.after_last_loop {
+                    self.exit_scope(ctx, scope);
+                }
+                self.mir.commit(
+                    before_break,
+                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_end)),
+                );
+
                 Ok(())
             }
             Some(keywords::Keyword::If) => {
@@ -128,19 +271,19 @@ impl Encoder {
                     _ => todo!(),
                 };
 
-                let cond = self.write_expr(cond, bb)?;
+                let cond = self.write_expr(cond, ctx.by_ref())?;
                 let (exit_id, exit_block) = self.mir.new_block();
                 let (if_true_id, if_true_block) = self.mir.new_block();
 
-                let cond_block = core::mem::replace(bb, if_true_block);
+                let cond_block = core::mem::replace(ctx.bb, if_true_block);
 
-                self.write_statement(if_true, bb)?;
+                self.write_statement(if_true, ctx.by_ref())?;
 
                 let if_false_id = if let Some(if_false) = if_false {
                     let (if_false_id, if_false_block) = self.mir.new_block();
-                    let branch_block = core::mem::replace(bb, if_false_block);
+                    let branch_block = core::mem::replace(ctx.bb, if_false_block);
 
-                    self.write_statement(if_false, bb)?;
+                    self.write_statement(if_false, ctx.by_ref())?;
 
                     self.mir.commit(
                         branch_block,
@@ -151,7 +294,7 @@ impl Encoder {
                     exit_id
                 };
 
-                let branch_block = core::mem::replace(bb, exit_block);
+                let branch_block = core::mem::replace(ctx.bb, exit_block);
 
                 self.mir.commit(
                     branch_block,
@@ -173,18 +316,18 @@ impl Encoder {
         }
     }
 
-    fn write_expr(&mut self, syn: &Syntax, bb: &mut BasicBlockBuilder) -> Result<mir::Val> {
+    fn write_expr(&mut self, syn: &Syntax, mut ctx: ScopeContext<'_>) -> Result<mir::Val> {
         match self.keywords.get(syn.name) {
             Some(keywords::Keyword::Eq) => {
                 let [left, right] = syn.args.as_slice() else {
                     todo!()
                 };
 
-                let left = self.write_expr(left, bb)?;
-                let right = self.write_expr(right, bb)?;
+                let left = self.write_expr(left, ctx.by_ref())?;
+                let right = self.write_expr(right, ctx.by_ref())?;
                 let temp = self.regs.create();
 
-                bb.instrs.push(mir::Instr::CmpEq {
+                ctx.bb.instrs.push(mir::Instr::CmpEq {
                     dest: temp,
                     left,
                     right,
@@ -197,11 +340,11 @@ impl Encoder {
                     todo!()
                 };
 
-                let left = self.write_expr(left, bb)?;
-                let right = self.write_expr(right, bb)?;
+                let left = self.write_expr(left, ctx.by_ref())?;
+                let right = self.write_expr(right, ctx.by_ref())?;
                 let temp = self.regs.create();
 
-                bb.instrs.push(mir::Instr::Sub {
+                ctx.bb.instrs.push(mir::Instr::Sub {
                     dest: temp,
                     left,
                     right,

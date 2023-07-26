@@ -13,6 +13,12 @@ pub struct ScopeToken(usize);
 #[derive(Clone, Copy)]
 pub struct ScopeRef<'a>(usize, PhantomData<&'a ScopeToken>);
 
+impl core::fmt::Debug for ScopeRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ScopeRef({})", self.0)
+    }
+}
+
 trait ConstMaybe {
     type Val<T>;
 
@@ -90,7 +96,7 @@ impl NameResolver {
         regs
     }
 
-    pub fn killed_nodes<'a>(&mut self, token: impl Into<ScopeRef<'a>>) -> Vec<Reg> {
+    pub fn scope_bindings<'a>(&mut self, token: impl Into<ScopeRef<'a>>) -> Vec<Reg> {
         self.killed_nodes_(token.into())
     }
 

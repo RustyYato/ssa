@@ -27,6 +27,7 @@ pub enum Keyword {
     Add,
     Sub,
     Eq,
+    DebugBlock,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -40,6 +41,7 @@ impl Keywords {
                 named_block_kw: IStr::new("named-block"),
                 kws: std::iter::FromIterator::from_iter([
                     (IStr::new("block"), Keyword::Block),
+                    (IStr::new("debug-block"), Keyword::DebugBlock),
                     (IStr::new("named-block"), Keyword::NamedBlock),
                     (IStr::new("let"), Keyword::Let),
                     (IStr::new("set"), Keyword::Set),
