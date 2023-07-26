@@ -71,11 +71,25 @@ impl<'text> Parser<'text> {
     pub fn parse_ws(&mut self) {
         let mut bytes = self.text;
 
-        while let [first, rest @ ..] = bytes {
-            if first.is_ascii_whitespace() {
-                bytes = rest;
-            } else {
-                break;
+        loop {
+            match bytes {
+                [b';', b';', rest @ ..] => {
+                    bytes = rest;
+                    loop {
+                        match bytes {
+                            [b'\n', next @ ..] => {
+                                bytes = next;
+                                break;
+                            }
+                            [_, next @ ..] => {
+                                bytes = next;
+                            }
+                            [] => return,
+                        }
+                    }
+                }
+                [b'\t' | b'\n' | b'\x0C' | b'\r' | b' ', rest @ ..] => bytes = rest,
+                _ => break,
             }
         }
 
