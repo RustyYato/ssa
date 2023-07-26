@@ -97,10 +97,10 @@ impl Encoder {
                 for arg in syn.args.as_slice() {
                     self.write_statement(arg, bb)?;
                 }
-                let regs = self.nr.close_scope_with(scope);
-                for reg in regs {
-                    // bb.instrs.push(mir::Instr::EndLifetime(reg));
-                }
+                self.nr.close_scope(scope);
+                // for reg in regs {
+                //     bb.instrs.push(mir::Instr::EndLifetime(reg));
+                // }
                 Ok(())
             }
             _ => todo!(),

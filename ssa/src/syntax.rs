@@ -27,20 +27,24 @@ impl Syntax {
         for _ in 0..depth {
             f.write_str("  ")?
         }
-        if self.args.is_empty() {
-            write!(f, "{}", self.name)
-        } else {
-            writeln!(f, "({}", self.name)?;
-            let mut first = true;
-            for arg in &self.args {
-                if first {
-                    first = false;
-                } else {
-                    f.write_str("\n")?
-                }
-                arg.fmt_display(depth + 1, f)?;
+        match self.args.len() {
+            0 => write!(f, "{}", self.name),
+            1 if self.args[0].args.is_empty() => {
+                write!(f, "({} {})", self.name, self.args[0].name)
             }
-            write!(f, ")")
+            _ => {
+                writeln!(f, "({}", self.name)?;
+                let mut first = true;
+                for arg in &self.args {
+                    if first {
+                        first = false;
+                    } else {
+                        f.write_str("\n")?
+                    }
+                    arg.fmt_display(depth + 1, f)?;
+                }
+                write!(f, ")")
+            }
         }
     }
 }
