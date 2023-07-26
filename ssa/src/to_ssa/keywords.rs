@@ -25,6 +25,7 @@ pub enum Keyword {
     Input,
     Print,
     Add,
+    Sub,
     Eq,
 }
 
@@ -50,6 +51,7 @@ impl Keywords {
                     (IStr::new("input"), Keyword::Input),
                     (IStr::new("print"), Keyword::Print),
                     (IStr::new("+"), Keyword::Add),
+                    (IStr::new("-"), Keyword::Sub),
                     (IStr::new("="), Keyword::Eq),
                 ]),
             })

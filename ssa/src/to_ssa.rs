@@ -20,6 +20,10 @@ pub enum EncodingError {
     MissingArgsForInput,
     TooManyArgsForInput,
     UnresolvedIdent(istr::IStr),
+    TooManyArgsForSet,
+    MissingArgsForSet,
+    MissingArgsForLet,
+    TooManyArgsForLet,
 }
 
 impl std::error::Error for EncodingError {}
@@ -66,9 +70,24 @@ impl Encoder {
                     todo!();
                     Ok(())
                 }
-                [] => Err(EncodingError::MissingArgsForPrint),
-                [_, _, _, ..] => Err(EncodingError::TooManyArgsForPrint),
+                [] => Err(EncodingError::MissingArgsForLet),
+                [_, _, _, ..] => Err(EncodingError::TooManyArgsForLet),
             },
+            Some(keywords::Keyword::Set) => match syn.args.as_slice() {
+                [ident, value] => {
+                    if ident.args.is_empty() {
+                        let reg = self.nr.resolve(ident.name)?;
+                        let val = self.write_expr(value, bb)?;
+                        bb.instrs.push(mir::Instr::Store { dest: reg, val });
+                    } else {
+                        todo!()
+                    }
+                    Ok(())
+                }
+                [] => Err(EncodingError::MissingArgsForSet),
+                [_, ..] => Err(EncodingError::TooManyArgsForSet),
+            },
+
             Some(keywords::Keyword::Print) => match syn.args.as_slice() {
                 [arg] => {
                     let val = self.write_expr(arg, bb)?;
@@ -166,6 +185,23 @@ impl Encoder {
                 let temp = self.regs.create();
 
                 bb.instrs.push(mir::Instr::CmpEq {
+                    dest: temp,
+                    left,
+                    right,
+                });
+
+                Ok(mir::Val::Reg(temp))
+            }
+            Some(keywords::Keyword::Sub) => {
+                let [left, right] = syn.args.as_slice() else {
+                    todo!()
+                };
+
+                let left = self.write_expr(left, bb)?;
+                let right = self.write_expr(right, bb)?;
+                let temp = self.regs.create();
+
+                bb.instrs.push(mir::Instr::Sub {
                     dest: temp,
                     left,
                     right,
