@@ -34,7 +34,11 @@ fn main() -> eyre::Result<()> {
     println!("{syn}");
 
     let enc = ssa::to_mir::Encoder::new();
-    let mir = enc.encode(&syn)?;
+    let mut mir = enc.encode(&syn)?;
+
+    println!("{mir}");
+
+    ssa::mir_opts::clean_up_jumps(&mut mir);
 
     println!("{mir}");
 

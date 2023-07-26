@@ -1,13 +1,18 @@
-use std::{collections::HashMap, num::NonZeroU32};
+use std::num::NonZeroU32;
+
+use hashbrown::HashMap;
 
 #[derive(Debug)]
 pub struct Mir {
-    blocks: Vec<BasicBlock>,
+    pub(crate) is_ssa: bool,
+    pub(crate) start: BasicBlockId,
+    pub(crate) blocks: HashMap<BasicBlockId, BasicBlock>,
 }
 
 impl core::fmt::Display for Mir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for block in &self.blocks {
+        writeln!(f, "start {}", self.start)?;
+        for (_, block) in &self.blocks {
             write!(f, "{block}")?;
         }
         Ok(())
@@ -54,16 +59,12 @@ impl MirBuilder {
         );
     }
 
-    pub fn finish(mut self) -> Mir {
-        let mut blocks = Vec::new();
-        for i in 0..self.next_id {
-            blocks.push(
-                self.blocks
-                    .remove(&BasicBlockId(NonZeroU32::new(i + 1).unwrap()))
-                    .unwrap(),
-            )
+    pub fn finish(self) -> Mir {
+        Mir {
+            is_ssa: false,
+            start: BasicBlockId(NonZeroU32::new(1).unwrap()),
+            blocks: self.blocks,
         }
-        Mir { blocks }
     }
 }
 
@@ -82,10 +83,20 @@ pub struct BasicBlockBuilder {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BasicBlock {
-    id: BasicBlockId,
-    args: Vec<Reg>,
-    instrs: Vec<Instr>,
-    term: Terminator,
+    pub(crate) id: BasicBlockId,
+    pub(crate) args: Vec<Reg>,
+    pub(crate) instrs: Vec<Instr>,
+    pub(crate) term: Terminator,
+}
+impl BasicBlock {
+    pub(crate) fn invalid() -> BasicBlock {
+        Self {
+            id: BasicBlockId(NonZeroU32::new(u32::MAX).unwrap()),
+            args: Vec::new(),
+            instrs: Vec::new(),
+            term: Terminator::ProgramExit,
+        }
+    }
 }
 
 impl core::fmt::Display for BasicBlock {

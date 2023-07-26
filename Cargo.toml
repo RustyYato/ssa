@@ -3,11 +3,7 @@
 
 resolver = '2'
 
-members = [
-    'ssa',
-    'colorz-eyre',
-    'colorz-spantrace',
-]
+members = ['ssa', 'colorz-eyre', 'colorz-spantrace']
 
 [workspace.dependencies.clap]
 version = '4'
@@ -22,6 +18,10 @@ version = '0.6'
 
 [workspace.dependencies.rustc-hash]
 version = '1'
+
+[workspace.dependencies.hashbrown]
+version = '0.14'
+features = ['raw']
 
 [workspace.dependencies.colorz-eyre]
 git = "https://github.com/RustyYato/colorz-eyre.git"

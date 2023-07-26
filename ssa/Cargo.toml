@@ -12,3 +12,4 @@ eyre = { workspace = true }
 colorz-eyre = { workspace = true }
 istr = { workspace = true }
 rustc-hash = { workspace = true }
+hashbrown = { workspace = true }
