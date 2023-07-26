@@ -5,6 +5,15 @@ pub struct Mir {
     blocks: Vec<BasicBlock>,
 }
 
+impl core::fmt::Display for Mir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for block in &self.blocks {
+            write!(f, "{block}")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct MirBuilder {
     next_id: u32,
@@ -79,6 +88,16 @@ pub struct BasicBlock {
     term: Terminator,
 }
 
+impl core::fmt::Display for BasicBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}{:?}", self.id, self.args)?;
+        for instr in &self.instrs {
+            writeln!(f, "    {instr}")?
+        }
+        writeln!(f, "    {}", self.term)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Instr {
     // Lifetime
@@ -100,11 +119,40 @@ pub enum Instr {
     CmpEq { dest: Reg, left: Val, right: Val },
 }
 
+impl core::fmt::Display for Instr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instr::StartLifetime(reg) => write!(f, "start_lt {reg}"),
+            Instr::EndLifetime(reg) => write!(f, "end_lt   {reg}"),
+            Instr::ConsolePrint(val) => write!(f, "print {val}"),
+            Instr::ConsoleInput(reg) => write!(f, "input {reg}"),
+            Instr::Store { dest, val } => write!(f, "{dest} = {val}"),
+            Instr::Add { dest, left, right } => write!(f, "{dest} = {left} + {right}"),
+            Instr::Mul { dest, left, right } => write!(f, "{dest} = {left} * {right}"),
+            Instr::Sub { dest, left, right } => write!(f, "{dest} = {left} - {right}"),
+            Instr::Div { dest, left, right } => write!(f, "{dest} = {left} / {right}"),
+            Instr::CmpEq { dest, left, right } => write!(f, "{dest} = cmp(=, {left}, {right})"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Val {
     ConstI32(i32),
     ConstBool(bool),
     Reg(Reg),
+}
+
+impl core::fmt::Display for Val {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let val: &dyn core::fmt::Display = match self {
+            Val::ConstI32(val) => val,
+            Val::ConstBool(val) => val,
+            Val::Reg(val) => val,
+        };
+
+        val.fmt(f)
+    }
 }
 
 pub struct RegAllocator(u32);
@@ -160,6 +208,12 @@ pub struct BasicBlockRef {
     pub args: Vec<Val>,
 }
 
+impl core::fmt::Display for BasicBlockRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{:?}", self.id, self.args)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Terminator {
     Jump(BasicBlockRef),
@@ -169,6 +223,20 @@ pub enum Terminator {
         if_false: BasicBlockRef,
     },
     ProgramExit,
+}
+
+impl core::fmt::Display for Terminator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Terminator::Jump(next) => write!(f, "jmp {next}"),
+            Terminator::If {
+                cond,
+                if_true,
+                if_false,
+            } => write!(f, "if {cond} {if_true} {if_false}"),
+            Terminator::ProgramExit => write!(f, "exit"),
+        }
+    }
 }
 
 impl BasicBlockRef {

@@ -36,7 +36,7 @@ fn main() -> eyre::Result<()> {
     let enc = ssa::to_mir::Encoder::new();
     let mir = enc.encode(&syn)?;
 
-    dbg!(mir);
+    println!("{mir}");
 
     Ok(())
 }
