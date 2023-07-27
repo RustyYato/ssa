@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use crate::{
     mir::{self, BasicBlockBuilder, MirBuilder},
     syntax::Syntax,
@@ -42,17 +44,19 @@ struct ScopeContext<'a> {
     scopes: ScopeList<'a>,
 }
 
+#[derive(Debug)]
+struct LoopInfo {
+    break_used: Cell<bool>,
+    continue_used: Cell<bool>,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct ScopeList<'a> {
     #[cfg(debug_assertions)]
     kind: &'static str,
     id: name_resolver::ScopeRef<'a>,
     after_last_loop: Option<name_resolver::ScopeRef<'a>>,
-    current_loop: Option<(
-        mir::BasicBlockId,
-        mir::BasicBlockId,
-        name_resolver::ScopeRef<'a>,
-    )>,
+    current_loop: Option<(mir::BasicBlockId, mir::BasicBlockId, &'a LoopInfo)>,
     prev: Option<&'a ScopeList<'a>>,
 }
 
@@ -67,8 +71,9 @@ impl<'a> ScopeContext<'a> {
     pub fn loop_scope<'b>(
         &'b mut self,
         loop_start: mir::BasicBlockId,
-        loop_end: mir::BasicBlockId,
+        loop_exit: mir::BasicBlockId,
         scope: name_resolver::ScopeRef<'b>,
+        loop_info: &'b LoopInfo,
     ) -> ScopeContext<'_> {
         ScopeContext {
             bb: self.bb,
@@ -78,7 +83,7 @@ impl<'a> ScopeContext<'a> {
                 id: scope,
                 prev: Some(&self.scopes),
                 after_last_loop: None,
-                current_loop: Some((loop_start, loop_end, scope)),
+                current_loop: Some((loop_start, loop_exit, loop_info)),
             },
         }
     }
@@ -149,12 +154,20 @@ impl Encoder {
         self.close_scope_unchecked(ctx.bb, scope);
     }
 
-    fn exit_scope(&mut self, ctx: ScopeContext<'_>, scope: name_resolver::ScopeRef<'_>) {
-        let vars = self.nr.scope_bindings(ctx.scopes.id);
+    fn exit_scope_unchecked(
+        &mut self,
+        bb: &mut BasicBlockBuilder,
+        scope: name_resolver::ScopeRef<'_>,
+    ) {
+        let vars = self.nr.scope_bindings(scope);
 
         for var in vars {
-            ctx.bb.instrs.push(mir::Instr::EndLifetime(var));
+            bb.instrs.push(mir::Instr::EndLifetime(var));
         }
+    }
+
+    fn exit_scope(&mut self, ctx: ScopeContext<'_>, scope: name_resolver::ScopeRef<'_>) {
+        self.exit_scope_unchecked(ctx.bb, scope)
     }
 
     fn block_scope<R>(
@@ -165,6 +178,24 @@ impl Encoder {
         let scope = self.nr.scope();
         let sub_ctx = ctx.block_scope(scope.as_ref());
         let output = f(self, sub_ctx)?;
+        self.close_scope(ctx, scope);
+        Ok(output)
+    }
+
+    fn loop_scope<R>(
+        &mut self,
+        mut ctx: ScopeContext<'_>,
+        loop_start: mir::BasicBlockId,
+        loop_exit: mir::BasicBlockId,
+        f: impl FnOnce(&mut Self, ScopeContext<'_>, &LoopInfo) -> Result<R>,
+    ) -> Result<R> {
+        let loop_info = LoopInfo {
+            break_used: Cell::new(false),
+            continue_used: Cell::new(false),
+        };
+        let scope = self.nr.scope();
+        let sub_ctx = ctx.loop_scope(loop_start, loop_exit, scope.as_ref(), &loop_info);
+        let output = f(self, sub_ctx, &loop_info)?;
         self.close_scope(ctx, scope);
         Ok(output)
     }
@@ -228,44 +259,62 @@ impl Encoder {
             Some(keywords::Keyword::Block) => self.block_scope(
                 ctx.by_ref(),
                 |this: &mut Self, mut ctx: ScopeContext<'_>| {
-                for arg in syn.args.as_slice() {
+                    for arg in syn.args.as_slice() {
                         this.write_statement(arg, ctx.by_ref())?;
-                }
+                    }
 
-                Ok(())
+                    Ok(())
                 },
             ),
             Some(keywords::Keyword::Loop) => {
-                let (loop_id, loop_block) = self.mir.new_block();
-                let (after_loop_id, after_loop_block) = self.mir.new_block();
+                let (loop_body, loop_body_block) = self.mir.new_block();
+                let (loop_start, loop_restart_block) = self.mir.new_block();
+                let (loop_exit, mut loop_exit_block) = self.mir.new_block();
 
-                let before_loop = core::mem::replace(ctx.bb, loop_block);
+                let before_loop = core::mem::replace(ctx.bb, loop_body_block);
                 self.mir.commit(
                     before_loop,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_id)),
+                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_body)),
                 );
 
-                let scope = self.nr.scope();
-                let mut loop_ctx = ctx.loop_scope(loop_id, after_loop_id, scope.as_ref());
-                for arg in syn.args.as_slice() {
-                    self.write_statement(arg, loop_ctx.by_ref())?;
-                }
+                let loop_block = self.loop_scope(
+                    ctx.by_ref(),
+                    loop_start,
+                    loop_exit,
+                    |this, mut ctx, loop_info| {
+                        for arg in syn.args.as_slice() {
+                            this.write_statement(arg, ctx.by_ref())?;
+                        }
 
-                let loop_block = core::mem::replace(ctx.bb, after_loop_block);
+                        if loop_info.break_used.get() {
+                            this.exit_scope_unchecked(&mut loop_exit_block, ctx.scopes.id);
+                        }
 
-                self.close_scope(ctx, scope);
+                        Ok(core::mem::replace(ctx.bb, loop_restart_block))
+                    },
+                )?;
+
+                let restart_loop_block = core::mem::replace(ctx.bb, loop_exit_block);
+
                 self.mir.commit(
                     loop_block,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_id)),
+                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_start)),
+                );
+
+                self.mir.commit(
+                    restart_loop_block,
+                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_body)),
                 );
 
                 Ok(())
             }
             Some(keywords::Keyword::Break) => {
-                let (_loop_start, loop_end, _loop_scope) = ctx
+                let (_loop_start, loop_end, loop_info) = ctx
                     .scopes
                     .current_loop
                     .ok_or(EncodingError::BreakOutOfLoop)?;
+
+                loop_info.break_used.set(true);
 
                 let (_, after_break) = self.mir.new_block();
 
@@ -283,10 +332,12 @@ impl Encoder {
                 Ok(())
             }
             Some(keywords::Keyword::Continue) => {
-                let (loop_start, _loop_end, _loop_scope) = ctx
+                let (loop_start, _loop_end, loop_info) = ctx
                     .scopes
                     .current_loop
                     .ok_or(EncodingError::BreakOutOfLoop)?;
+
+                loop_info.continue_used.set(true);
 
                 let (_, after_break) = self.mir.new_block();
 
