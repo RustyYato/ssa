@@ -3,7 +3,7 @@
 
 resolver = '2'
 
-members = ['ssa', 'colorz-eyre', 'colorz-spantrace']
+members = ['ssa']
 
 [workspace.dependencies.clap]
 version = '4'
