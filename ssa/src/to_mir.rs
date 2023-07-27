@@ -341,42 +341,36 @@ impl Encoder {
         }
     }
 
-    fn write_expr(&mut self, syn: &Syntax, mut ctx: ScopeContext<'_>) -> Result<mir::Val> {
+    fn binary_op(
+        &mut self,
+        syn: &Syntax,
+        mut ctx: ScopeContext<'_>,
+        f: impl FnOnce(mir::Reg, mir::Val, mir::Val) -> mir::Instr,
+    ) -> Result<mir::Val> {
+        let [left, right] = syn.args.as_slice() else {
+            todo!()
+        };
+
+        let left = self.write_expr(left, ctx.by_ref())?;
+        let right = self.write_expr(right, ctx.by_ref())?;
+        let temp = self.regs.create();
+
+        ctx.bb.instrs.push(f(temp, left, right));
+
+        Ok(mir::Val::Reg(temp))
+    }
+
+    fn write_expr(&mut self, syn: &Syntax, ctx: ScopeContext<'_>) -> Result<mir::Val> {
         match self.keywords.get(syn.name) {
-            Some(keywords::Keyword::Eq) => {
-                let [left, right] = syn.args.as_slice() else {
-                    todo!()
-                };
-
-                let left = self.write_expr(left, ctx.by_ref())?;
-                let right = self.write_expr(right, ctx.by_ref())?;
-                let temp = self.regs.create();
-
-                ctx.bb.instrs.push(mir::Instr::CmpEq {
-                    dest: temp,
-                    left,
-                    right,
-                });
-
-                Ok(mir::Val::Reg(temp))
-            }
-            Some(keywords::Keyword::Sub) => {
-                let [left, right] = syn.args.as_slice() else {
-                    todo!()
-                };
-
-                let left = self.write_expr(left, ctx.by_ref())?;
-                let right = self.write_expr(right, ctx.by_ref())?;
-                let temp = self.regs.create();
-
-                ctx.bb.instrs.push(mir::Instr::Sub {
-                    dest: temp,
-                    left,
-                    right,
-                });
-
-                Ok(mir::Val::Reg(temp))
-            }
+            Some(keywords::Keyword::Eq) => self.binary_op(syn, ctx, |dest, left, right| {
+                mir::Instr::CmpEq { dest, left, right }
+            }),
+            Some(keywords::Keyword::Add) => self.binary_op(syn, ctx, |dest, left, right| {
+                mir::Instr::Add { dest, left, right }
+            }),
+            Some(keywords::Keyword::Sub) => self.binary_op(syn, ctx, |dest, left, right| {
+                mir::Instr::Sub { dest, left, right }
+            }),
             Some(_) => {
                 todo!()
             }
