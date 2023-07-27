@@ -157,6 +157,18 @@ impl Encoder {
         }
     }
 
+    fn block_scope<R>(
+        &mut self,
+        mut ctx: ScopeContext<'_>,
+        f: impl FnOnce(&mut Self, ScopeContext<'_>) -> Result<R>,
+    ) -> Result<R> {
+        let scope = self.nr.scope();
+        let sub_ctx = ctx.block_scope(scope.as_ref());
+        let output = f(self, sub_ctx)?;
+        self.close_scope(ctx, scope);
+        Ok(output)
+    }
+
     fn write_statement(&mut self, syn: &Syntax, mut ctx: ScopeContext<'_>) -> Result<()> {
         match self.keywords.get(syn.name) {
             Some(keywords::Keyword::Let) => match syn.args.as_slice() {
@@ -213,15 +225,16 @@ impl Encoder {
                 [] => Err(EncodingError::MissingArgsForPrint),
                 [_, _, ..] => Err(EncodingError::TooManyArgsForPrint),
             },
-            Some(keywords::Keyword::Block) => {
-                let scope = self.nr.scope();
-                let mut block_ctx = ctx.block_scope(scope.as_ref());
+            Some(keywords::Keyword::Block) => self.block_scope(
+                ctx.by_ref(),
+                |this: &mut Self, mut ctx: ScopeContext<'_>| {
                 for arg in syn.args.as_slice() {
-                    self.write_statement(arg, block_ctx.by_ref())?;
+                        this.write_statement(arg, ctx.by_ref())?;
                 }
-                self.close_scope(ctx, scope);
+
                 Ok(())
-            }
+                },
+            ),
             Some(keywords::Keyword::Loop) => {
                 let (loop_id, loop_block) = self.mir.new_block();
                 let (after_loop_id, after_loop_block) = self.mir.new_block();
@@ -302,19 +315,17 @@ impl Encoder {
 
                 let cond_block = core::mem::replace(ctx.bb, if_true_block);
 
-                let scope = self.nr.scope();
-                let if_true_ctx = ctx.block_scope(scope.as_ref());
-                self.write_statement(if_true, if_true_ctx)?;
-                self.close_scope(ctx.by_ref(), scope);
+                self.block_scope(ctx.by_ref(), |this: &mut Self, ctx: ScopeContext<'_>| {
+                    this.write_statement(if_true, ctx)
+                })?;
 
                 let if_false_id = if let Some(if_false) = if_false {
                     let (if_false_id, if_false_block) = self.mir.new_block();
                     let branch_block = core::mem::replace(ctx.bb, if_false_block);
 
-                    let scope = self.nr.scope();
-                    let if_false_scope = ctx.block_scope(scope.as_ref());
-                    self.write_statement(if_false, if_false_scope)?;
-                    self.close_scope(ctx.by_ref(), scope);
+                    self.block_scope(ctx.by_ref(), |this: &mut Self, ctx: ScopeContext<'_>| {
+                        this.write_statement(if_false, ctx)
+                    })?;
 
                     self.mir.commit(
                         branch_block,
