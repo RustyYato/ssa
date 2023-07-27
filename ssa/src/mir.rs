@@ -213,10 +213,26 @@ impl core::fmt::Display for BasicBlockId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BasicBlockRef {
     pub id: BasicBlockId,
     pub args: Vec<Val>,
+}
+
+impl Clone for BasicBlockRef {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            args: self.args.clone(),
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        let Self { id, args } = self;
+
+        *id = source.id;
+        args.clone_from(&source.args);
+    }
 }
 
 impl core::fmt::Display for BasicBlockRef {

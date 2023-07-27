@@ -11,8 +11,49 @@ enum Access {
 pub fn clean_up_jumps(mir: &mut mir::Mir) {
     assert!(!mir.is_ssa);
 
+    jump_threading(mir);
     let access_counts = remove_inaccessible_blocks(mir);
     consolidate_single_source_jumps(mir, access_counts);
+}
+
+fn jump_threading(mir: &mut mir::Mir) {
+    let table = mir.blocks.raw_table_mut();
+    let iter = unsafe { table.iter() };
+
+    for bucket in iter {
+        let (id, block) = unsafe { bucket.as_mut() };
+
+        let resolve_jump_target = |next: &mut mir::BasicBlockRef| {
+            while next.id != *id {
+                let block = &mir.blocks[&next.id];
+                match &block.term {
+                    mir::Terminator::Jump(next_next) => {
+                        if block.instrs.is_empty() {
+                            next.clone_from(next_next);
+                        } else {
+                            break;
+                        }
+                    }
+                    mir::Terminator::If { .. } | mir::Terminator::ProgramExit => break,
+                }
+            }
+        };
+
+        match &mut block.term {
+            mir::Terminator::Jump(next) => {
+                resolve_jump_target(next);
+            }
+            mir::Terminator::If {
+                cond: _,
+                if_true,
+                if_false,
+            } => {
+                resolve_jump_target(if_true);
+                resolve_jump_target(if_false);
+            }
+            mir::Terminator::ProgramExit => (),
+        }
+    }
 }
 
 fn remove_inaccessible_blocks(mir: &mut mir::Mir) -> HashMap<mir::BasicBlockId, Access> {
