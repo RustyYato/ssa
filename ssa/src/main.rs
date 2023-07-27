@@ -30,15 +30,16 @@ fn main() -> eyre::Result<()> {
 
     let syn = ssa::syntax::Syntax::from_bytes(&input)?;
 
-    dbg!(&syn);
-    println!("{syn}");
+    println!("{syn}\n");
 
     let enc = ssa::to_mir::Encoder::new();
     let mut mir = enc.encode(&syn)?;
 
+    ssa::mir_opts::clean_up_jumps(&mut mir);
+
     println!("{mir}");
 
-    ssa::mir_opts::clean_up_jumps(&mut mir);
+    let mir = ssa::to_ssa::to_ssa(&mir);
 
     println!("{mir}");
 

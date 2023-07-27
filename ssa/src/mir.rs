@@ -52,7 +52,7 @@ impl MirBuilder {
             bb.id,
             BasicBlock {
                 id: bb.id,
-                args: bb.args,
+                args: bb.args.into_iter().map(Some).collect(),
                 instrs: bb.instrs,
                 term,
             },
@@ -84,14 +84,14 @@ pub struct BasicBlockBuilder {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BasicBlock {
     pub(crate) id: BasicBlockId,
-    pub(crate) args: Vec<Reg>,
+    pub(crate) args: Vec<Option<Reg>>,
     pub(crate) instrs: Vec<Instr>,
     pub(crate) term: Terminator,
 }
 impl BasicBlock {
     pub(crate) fn invalid() -> BasicBlock {
         Self {
-            id: BasicBlockId(NonZeroU32::new(u32::MAX).unwrap()),
+            id: BasicBlockId::invalid(),
             args: Vec::new(),
             instrs: Vec::new(),
             term: Terminator::ProgramExit,
@@ -184,6 +184,20 @@ pub struct Reg(NonZeroU32);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BasicBlockId(NonZeroU32);
+
+impl BasicBlockId {
+    pub fn to_usize(self) -> usize {
+        self.0.get().wrapping_sub(1) as usize
+    }
+
+    pub(crate) fn invalid() -> Self {
+        BasicBlockId(NonZeroU32::new(u32::MAX).unwrap())
+    }
+
+    pub(crate) fn normal_start() -> Self {
+        BasicBlockId(NonZeroU32::new(1).unwrap())
+    }
+}
 
 impl core::fmt::Debug for Reg {
     #[inline]

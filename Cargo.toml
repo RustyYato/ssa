@@ -23,6 +23,12 @@ version = '1'
 version = '0.14'
 features = ['raw']
 
+[workspace.dependencies.petgraph]
+version = '0.6'
+
+[workspace.dependencies.fixedbitset]
+version = '0.4'
+
 [workspace.dependencies.colorz-eyre]
 git = "https://github.com/RustyYato/colorz-eyre.git"
 branch = "master"

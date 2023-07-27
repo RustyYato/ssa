@@ -13,3 +13,5 @@ colorz-eyre = { workspace = true }
 istr = { workspace = true }
 rustc-hash = { workspace = true }
 hashbrown = { workspace = true }
+petgraph = { workspace = true }
+fixedbitset = { workspace = true }
