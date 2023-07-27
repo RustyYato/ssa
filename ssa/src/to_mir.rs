@@ -302,13 +302,19 @@ impl Encoder {
 
                 let cond_block = core::mem::replace(ctx.bb, if_true_block);
 
-                self.write_statement(if_true, ctx.by_ref())?;
+                let scope = self.nr.scope();
+                let if_true_ctx = ctx.block_scope(scope.as_ref());
+                self.write_statement(if_true, if_true_ctx)?;
+                self.close_scope(ctx.by_ref(), scope);
 
                 let if_false_id = if let Some(if_false) = if_false {
                     let (if_false_id, if_false_block) = self.mir.new_block();
                     let branch_block = core::mem::replace(ctx.bb, if_false_block);
 
-                    self.write_statement(if_false, ctx.by_ref())?;
+                    let scope = self.nr.scope();
+                    let if_false_scope = ctx.block_scope(scope.as_ref());
+                    self.write_statement(if_false, if_false_scope)?;
+                    self.close_scope(ctx.by_ref(), scope);
 
                     self.mir.commit(
                         branch_block,
