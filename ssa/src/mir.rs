@@ -166,7 +166,7 @@ impl core::fmt::Display for Val {
     }
 }
 
-pub struct RegAllocator(u32);
+pub(crate) struct RegAllocator(u32);
 
 impl RegAllocator {
     pub fn new() -> Self {

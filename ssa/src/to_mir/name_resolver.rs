@@ -4,7 +4,7 @@ use crate::mir::{Reg, RegAllocator};
 
 use super::EncodingError;
 
-pub struct NameResolver {
+pub(crate) struct NameResolver {
     names: istr::IStrMap<Vec<Reg>>,
     scope: Vec<istr::IStr>,
 }
@@ -45,9 +45,9 @@ impl ConstMaybe for Just {
 impl ConstMaybe for Nothing {
     type Val<T> = ();
 
-    fn new<T>(f: impl FnOnce() -> T) -> Self::Val<T> {}
+    fn new<T>(_f: impl FnOnce() -> T) -> Self::Val<T> {}
 
-    fn mutate<T>(val: &mut Self::Val<T>, f: impl FnOnce(&mut T)) {}
+    fn mutate<T>(_val: &mut Self::Val<T>, _f: impl FnOnce(&mut T)) {}
 }
 
 impl NameResolver {
@@ -78,20 +78,10 @@ impl NameResolver {
         ScopeToken(self.scope.len())
     }
 
-    pub fn close_scope(&mut self, token: ScopeToken) {
-        self.close_scope_::<Nothing>(token)
-    }
-
     pub fn close_scope_with(&mut self, token: ScopeToken) -> Vec<Reg> {
-        self.close_scope_::<Just>(token)
-    }
-
-    fn close_scope_<O: ConstMaybe>(&mut self, token: ScopeToken) -> O::Val<Vec<Reg>> {
-        let mut regs = O::new(Vec::new);
+        let mut regs = Vec::new();
         for ident in self.scope.drain(token.0..).rev() {
-            O::mutate(&mut regs, |regs| {
-                regs.push(self.names.get_mut(&ident).unwrap().pop().unwrap());
-            });
+            regs.push(self.names.get_mut(&ident).unwrap().pop().unwrap());
         }
         regs
     }

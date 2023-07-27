@@ -41,7 +41,7 @@ type Result<T, E = EncodingError> = std::result::Result<T, E>;
 #[derive(Debug)]
 struct ScopeContext<'a> {
     bb: &'a mut BasicBlockBuilder,
-    scopes: ScopeList<'a>,
+    scopes: ScopeInfo<'a>,
 }
 
 #[derive(Debug)]
@@ -51,13 +51,12 @@ struct LoopInfo {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct ScopeList<'a> {
+struct ScopeInfo<'a> {
     #[cfg(debug_assertions)]
-    kind: &'static str,
+    _kind: &'static str,
     id: name_resolver::ScopeRef<'a>,
     after_last_loop: Option<name_resolver::ScopeRef<'a>>,
     current_loop: Option<(mir::BasicBlockId, mir::BasicBlockId, &'a LoopInfo)>,
-    prev: Option<&'a ScopeList<'a>>,
 }
 
 impl<'a> ScopeContext<'a> {
@@ -77,11 +76,11 @@ impl<'a> ScopeContext<'a> {
     ) -> ScopeContext<'_> {
         ScopeContext {
             bb: self.bb,
-            scopes: ScopeList {
+            scopes: ScopeInfo {
                 #[cfg(debug_assertions)]
-                kind: "loop",
+                _kind: "loop",
                 id: scope,
-                prev: Some(&self.scopes),
+                // prev: Some(&self.scopes),
                 after_last_loop: None,
                 current_loop: Some((loop_start, loop_exit, loop_info)),
             },
@@ -91,11 +90,11 @@ impl<'a> ScopeContext<'a> {
     pub fn block_scope<'b>(&'b mut self, scope: name_resolver::ScopeRef<'b>) -> ScopeContext<'_> {
         ScopeContext {
             bb: self.bb,
-            scopes: ScopeList {
+            scopes: ScopeInfo {
                 #[cfg(debug_assertions)]
-                kind: "block",
+                _kind: "block",
                 id: scope,
-                prev: Some(&self.scopes),
+                // prev: Some(&self.scopes),
                 after_last_loop: Some(self.scopes.after_last_loop.unwrap_or(scope)),
                 current_loop: self.scopes.current_loop,
             },
@@ -117,11 +116,11 @@ impl Encoder {
         let (_id, mut block) = self.mir.new_block();
 
         let scope = self.nr.scope();
-        let scopes = ScopeList {
+        let scopes = ScopeInfo {
             #[cfg(debug_assertions)]
-            kind: "root",
+            _kind: "root",
             id: scope.as_ref(),
-            prev: None,
+            // prev: None,
             after_last_loop: None,
             current_loop: None,
         };
@@ -212,12 +211,12 @@ impl Encoder {
                     }
                     Ok(())
                 }
-                [name, val] => {
-                    todo!();
-                    Ok(())
-                }
+                // [name, val] => {
+                //     todo!();
+                //     Ok(())
+                // }
                 [] => Err(EncodingError::MissingArgsForLet),
-                [_, _, _, ..] => Err(EncodingError::TooManyArgsForLet),
+                [_, _, ..] => Err(EncodingError::TooManyArgsForLet),
             },
             Some(keywords::Keyword::Set) => match syn.args.as_slice() {
                 [ident, value] => {
@@ -454,5 +453,11 @@ impl Encoder {
                 }
             }
         }
+    }
+}
+
+impl Default for Encoder {
+    fn default() -> Self {
+        Self::new()
     }
 }
