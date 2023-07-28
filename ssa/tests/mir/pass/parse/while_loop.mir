@@ -4,18 +4,22 @@ bb1[]
     r1 = 100
     jmp bb2[]
 bb2[]
+    start_lt r2
+    r2 = 0
     if r1 bb6[] bb7[]
 bb3[]
+    end_lt   r2
     jmp bb2[]
 bb4[]
+    end_lt   r2
     end_lt   r1
     exit
 bb5[]
     jmp bb3[]
 bb6[]
     print r1
-    r2 = r1 - 1
-    r1 = r2
+    r3 = r1 - 1
+    r1 = r3
     jmp bb5[]
 bb7[]
     jmp bb4[]
