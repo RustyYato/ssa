@@ -9,10 +9,37 @@ pub struct Mir {
     pub(crate) blocks: HashMap<BasicBlockId, BasicBlock>,
 }
 
+#[derive(Debug)]
+pub struct StableDisplayMir {
+    pub(crate) blocks: Vec<BasicBlock>,
+    start: BasicBlockId,
+}
+
+impl From<Mir> for StableDisplayMir {
+    fn from(mir: Mir) -> Self {
+        let mut blocks = Vec::from_iter(mir.blocks.into_values());
+        blocks.sort_unstable_by_key(|block| block.id);
+        Self {
+            start: mir.start,
+            blocks,
+        }
+    }
+}
+
 impl core::fmt::Display for Mir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "start {}", self.start)?;
         for (_, block) in &self.blocks {
+            write!(f, "{block}")?;
+        }
+        Ok(())
+    }
+}
+
+impl core::fmt::Display for StableDisplayMir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "start {}", self.start)?;
+        for block in &self.blocks {
             write!(f, "{block}")?;
         }
         Ok(())
