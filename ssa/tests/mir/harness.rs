@@ -440,7 +440,7 @@ pub fn run_tests() -> std::io::Result<()> {
     }
 }
 
-fn print_diff(error: &str, expected: &str) {
+fn print_diff<W: io::Write>(writer: &mut W, error: &str, expected: &str) -> io::Result<()> {
     const EQUAL: colorz::Style<colorz::ansi::BrightBlack, colorz::NoColor, colorz::NoColor> =
         colorz::Style::new().fg(colorz::ansi::BrightBlack);
 
@@ -454,11 +454,13 @@ fn print_diff(error: &str, expected: &str) {
 
     for chunk in diff {
         match chunk {
-            dissimilar::Chunk::Equal(x) => print!("{}", x.style_with(EQUAL)),
-            dissimilar::Chunk::Delete(x) => print!("{}", x.style_with(DELETE)),
-            dissimilar::Chunk::Insert(x) => print!("{}", x.style_with(INSERT)),
+            dissimilar::Chunk::Equal(x) => write!(writer, "{}", x.style_with(EQUAL))?,
+            dissimilar::Chunk::Delete(x) => write!(writer, "{}", x.style_with(DELETE))?,
+            dissimilar::Chunk::Insert(x) => write!(writer, "{}", x.style_with(INSERT))?,
         }
     }
+
+    Ok(())
 }
 
 fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
@@ -550,7 +552,7 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
 
                 let found = found.trim();
                 if let Some(expected) = output.test.expected.as_deref() {
-                    print_diff(found, expected)
+                    print_diff(&mut stdout, found, expected).unwrap()
                 } else {
                     println!("{}", found);
                 }
