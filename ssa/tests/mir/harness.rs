@@ -506,7 +506,7 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
             TestResult::Regen => {
                 println!(
                     "{} test: [{}] {}",
-                    "Regenerate".magenta(),
+                    "Regenerated".magenta(),
                     output.test.source.name.bright_magenta(),
                     output.test.path.display().bright_magenta()
                 );
@@ -519,7 +519,7 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
                 }
                 println!(
                     "{} test: [{}] {}",
-                    "Save".blue(),
+                    "Saved".blue(),
                     output.test.source.name.blue(),
                     output.test.path.display().blue()
                 );
@@ -544,8 +544,8 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
             }
             TestResult::Fail { found } => {
                 println!(
-                    "Test {}: [{}] {}",
-                    "failed".red(),
+                    "{} test: [{}] {}",
+                    "Failed".red(),
                     output.test.source.name.red(),
                     output.test.path.display().red()
                 );
