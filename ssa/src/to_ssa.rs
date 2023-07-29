@@ -442,16 +442,8 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
     let dom_frontier = &dominator_frontier(mir, predecessors, dominators);
     let block_args = &calculate_block_args(mir, dom_frontier, &mut regs);
 
-    // stablize output
-    let mut stable_block_args = Vec::from_iter(
-        block_args
-            .iter()
-            .map(|(&block_id, block)| (block_id, block)),
-    );
-    stable_block_args.sort_unstable();
-
-    for (block_id, args) in stable_block_args {
-        let (_regs, variables) = variables.get_mut(&block_id).unwrap();
+    for (block_id, args) in block_args {
+        let (_regs, variables) = variables.get_mut(block_id).unwrap();
         for &(arg, new_reg) in args {
             variables.entry(arg).or_insert(new_reg);
         }
