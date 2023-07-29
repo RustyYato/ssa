@@ -19,6 +19,9 @@ version = '0.6'
 [workspace.dependencies.rustc-hash]
 version = '1'
 
+[workspace.dependencies.either]
+version = '1'
+
 [workspace.dependencies.hashbrown]
 version = '0.14'
 features = ['raw']

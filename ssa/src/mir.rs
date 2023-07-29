@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use hashbrown::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mir {
     pub(crate) is_ssa: bool,
     pub(crate) start: BasicBlockId,
@@ -237,6 +237,7 @@ impl core::fmt::Display for Val {
     }
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct RegAllocator(u32);
 
 impl RegAllocator {
