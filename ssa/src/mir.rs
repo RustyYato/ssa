@@ -147,14 +147,26 @@ pub enum Instr {
     ConsoleInput(Reg),
 
     // memory ops
-    Store { dest: Reg, val: Val },
+    Store {
+        dest: Reg,
+        val: Val,
+    },
 
-    // math ops
-    Add { dest: Reg, left: Val, right: Val },
-    Mul { dest: Reg, left: Val, right: Val },
-    Sub { dest: Reg, left: Val, right: Val },
-    Div { dest: Reg, left: Val, right: Val },
-    CmpEq { dest: Reg, left: Val, right: Val },
+    BinOp {
+        op: BinOp,
+        dest: Reg,
+        left: Val,
+        right: Val,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    CmpEq,
 }
 
 impl core::fmt::Display for Instr {
@@ -165,11 +177,27 @@ impl core::fmt::Display for Instr {
             Instr::ConsolePrint(val) => write!(f, "print {val}"),
             Instr::ConsoleInput(reg) => write!(f, "input {reg}"),
             Instr::Store { dest, val } => write!(f, "{dest} = {val}"),
-            Instr::Add { dest, left, right } => write!(f, "{dest} = {left} + {right}"),
-            Instr::Mul { dest, left, right } => write!(f, "{dest} = {left} * {right}"),
-            Instr::Sub { dest, left, right } => write!(f, "{dest} = {left} - {right}"),
-            Instr::Div { dest, left, right } => write!(f, "{dest} = {left} / {right}"),
-            Instr::CmpEq { dest, left, right } => write!(f, "{dest} = cmp(=, {left}, {right})"),
+            Instr::BinOp {
+                op: BinOp::CmpEq,
+                dest,
+                left,
+                right,
+            } => write!(f, "{dest} = cmp(=, {left}, {right})"),
+            Instr::BinOp {
+                op,
+                dest,
+                left,
+                right,
+            } => {
+                let op = match op {
+                    BinOp::Add => "+",
+                    BinOp::Sub => "-",
+                    BinOp::Mul => "*",
+                    BinOp::Div => "/",
+                    BinOp::CmpEq => unreachable!(),
+                };
+                write!(f, "{dest} = {left} {op} {right}")
+            }
         }
     }
 }

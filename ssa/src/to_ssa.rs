@@ -282,14 +282,16 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                             nr.insert(dest, new_reg);
                             mir::Instr::Store { dest: new_reg, val }
                         }
-                        mir::Instr::Add { dest, left, right } => todo!(),
-                        mir::Instr::Mul { dest, left, right } => todo!(),
-                        mir::Instr::Sub { dest, left, right } => todo!(),
-                        mir::Instr::Div { dest, left, right } => todo!(),
-                        mir::Instr::CmpEq { dest, left, right } => {
+                        mir::Instr::BinOp {
+                            op,
+                            dest,
+                            left,
+                            right,
+                        } => {
                             let new_reg = regs.create();
                             nr.insert(dest, new_reg);
-                            mir::Instr::CmpEq {
+                            mir::Instr::BinOp {
+                                op,
                                 dest: new_reg,
                                 left: resolve(&mut nr, left),
                                 right: resolve(&mut nr, right),

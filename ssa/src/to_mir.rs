@@ -429,15 +429,30 @@ impl Encoder {
 
     fn write_expr(&mut self, syn: &Syntax, ctx: ScopeContext<'_>) -> Result<mir::Val> {
         match self.keywords.get(syn.name) {
-            Some(keywords::Keyword::Eq) => self.binary_op(syn, ctx, |dest, left, right| {
-                mir::Instr::CmpEq { dest, left, right }
-            }),
-            Some(keywords::Keyword::Add) => self.binary_op(syn, ctx, |dest, left, right| {
-                mir::Instr::Add { dest, left, right }
-            }),
-            Some(keywords::Keyword::Sub) => self.binary_op(syn, ctx, |dest, left, right| {
-                mir::Instr::Sub { dest, left, right }
-            }),
+            Some(keywords::Keyword::Eq) => {
+                self.binary_op(syn, ctx, |dest, left, right| mir::Instr::BinOp {
+                    op: mir::BinOp::CmpEq,
+                    dest,
+                    left,
+                    right,
+                })
+            }
+            Some(keywords::Keyword::Add) => {
+                self.binary_op(syn, ctx, |dest, left, right| mir::Instr::BinOp {
+                    op: mir::BinOp::Add,
+                    dest,
+                    left,
+                    right,
+                })
+            }
+            Some(keywords::Keyword::Sub) => {
+                self.binary_op(syn, ctx, |dest, left, right| mir::Instr::BinOp {
+                    op: mir::BinOp::Sub,
+                    dest,
+                    left,
+                    right,
+                })
+            }
             Some(_) => {
                 todo!()
             }
