@@ -37,10 +37,14 @@ fn main() -> eyre::Result<()> {
 
     ssa::mir_opts::clean_up_jumps(&mut mir);
 
+    println!("{0:=>18} OPT MIR {0:=>18}", "");
     println!("{mir}");
 
     let mir = ssa::to_ssa::to_ssa(&mir);
 
+    let mir = ssa::mir::StableDisplayMir::from(mir);
+
+    println!("{0:=>20} SSA {0:=>20}", "");
     println!("{mir}");
 
     Ok(())

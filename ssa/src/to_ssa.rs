@@ -195,7 +195,7 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
     }
 
     let mut builder = mir::MirBuilder::default();
-    let mut regs = mir::RegAllocator::new();
+    let mut regs = &mut mir::RegAllocator::new();
 
     let mut queue = VecDeque::new();
     let mut visited = graph.visit_map();
@@ -204,12 +204,18 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
 
     assert!(!petgraph::algo::is_cyclic_directed(graph)); // for now we don't handle loops
 
-    let mut names = HashMap::<mir::BasicBlockId, HashMap<mir::Reg, mir::Reg>>::new();
+    type Reg2Reg = HashMap<mir::Reg, mir::Reg>;
+    type BlockArgs = Vec<(mir::Reg, Vec<(mir::BasicBlockId, mir::Reg)>)>;
+    type BlockMap<T> = HashMap<mir::BasicBlockId, T>;
+
+    let mut names = BlockMap::<Reg2Reg>::new();
+    let mut block_args = BlockMap::<BlockArgs>::new();
     let mut block_mapping = HashMap::new();
 
-    while let Some(action) = queue.pop_front() {
-        dbg!(&action);
+    let mut resolve_visited = HashSet::new();
+    let mut resolve_stack = Vec::new();
 
+    while let Some(action) = queue.pop_front() {
         let mut visit = |next: mir::BasicBlockId| {
             if !visited.contains(next.to_usize()) {
                 visited.insert(next.to_usize());
@@ -217,52 +223,90 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
             }
         };
 
-        let make_resolve = |block_id| {
-            let dominators = &dominators;
-            let predessors = &predessors;
-            let names = &names;
-
-            let resolve = move |nr: &mut HashMap<mir::Reg, mir::Reg>, reg: mir::Reg| -> mir::Reg {
+        let mut resolve = |block_id,
+                           names: &BlockMap<Reg2Reg>,
+                           block_args: &mut BlockArgs,
+                           regs: &mut mir::RegAllocator,
+                           nr: &mut _,
+                           val: mir::Val|
+         -> mir::Val {
+            let resolve = |nr: &mut Reg2Reg, reg: mir::Reg| -> mir::Reg {
                 if let Some(&name) = nr.get(&reg) {
+                    // FIXME: with loops we may miss other sources
                     return name;
                 }
 
                 let NodeId(dom) = dominators.immediate_dominator(NodeId(block_id)).unwrap();
                 let pred = &predessors[&block_id][..];
 
-                dbg!(dom);
-                dbg!(&names);
-                dbg!(pred);
-
                 let mut of_dominator = None;
+                let mut other_branches = Vec::new();
+                resolve_visited.clear();
+                resolve_visited.extend(pred);
+                resolve_stack.extend(pred.iter().copied().zip(core::iter::repeat(false)));
 
-                for &bb in pred {
-                    dbg!(bb);
+                // use a fix-point search up to the dominator to capture all
+                // possible sources for reg.
+                while let Some((bb, is_dom)) = resolve_stack.pop() {
                     let x = names[&bb].get(&reg).copied();
+                    let is_dom = is_dom || bb == dom;
 
-                    if bb == dom {
-                        of_dominator = Some(x.unwrap());
+                    if let Some(x) = x {
+                        // if the current node contains an assignment to the regsiter
+                        // collect that assignment
+                        // this is one base case
+                        if is_dom {
+                            of_dominator = Some((bb, x));
+                        } else {
+                            other_branches.push((bb, x));
+                        }
+                    } else if is_dom {
+                        // but if the register isn't found in the current dominator
+                        // we can skip to the previous dominator
+                        // we can guaranteed that the reg won't be set in any non-dominating
+                        // block of the dominator since that would imply that we placed a block arg
+                        // incorrectly, which can't happen by induction (this is the inductive case)
+                        let dom = dominators.immediate_dominator(NodeId(block_id)).unwrap().0;
+                        resolve_stack.push((dom, true));
                     } else {
-                        //
-                    }
+                        // if the node isn't a dominator, then walk the predecessors to collect any
+                        // assignments in there too
+                        // this is one base case
 
-                    dbg!((bb, x, bb == dom));
+                        for &bb in &predessors[&block_id][..] {
+                            if resolve_visited.insert(bb) {
+                                resolve_stack.push((bb, false));
+                            }
+                        }
+                    }
                 }
 
-                todo!()
+                let (dom, dom_reg) = of_dominator.unwrap();
+
+                if other_branches.is_empty() {
+                    dom_reg
+                } else {
+                    let reg = regs.create();
+
+                    other_branches.push((dom, dom_reg));
+                    block_args.push((reg, other_branches));
+
+                    reg
+                }
             };
 
-            move |nr: &mut _, val: mir::Val| -> mir::Val {
-                match val {
-                    mir::Val::ConstI32(_) | mir::Val::ConstBool(_) => val,
-                    mir::Val::Reg(reg) => mir::Val::Reg(resolve(nr, reg)),
-                }
+            match val {
+                mir::Val::ConstI32(_) | mir::Val::ConstBool(_) => val,
+                mir::Val::Reg(reg) => mir::Val::Reg({ resolve }(nr, reg)),
             }
         };
 
         match action {
             Action::Process(block_id) => {
-                let resolve = make_resolve(block_id);
+                let mut current_block_args = BlockArgs::default();
+                let mut resolve = |nr: &mut _, regs: &mut mir::RegAllocator, val| {
+                    resolve(block_id, &names, &mut current_block_args, regs, nr, val)
+                };
 
                 let mut nr = HashMap::new();
 
@@ -275,7 +319,7 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                         mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
 
                         mir::Instr::ConsolePrint(val) => {
-                            mir::Instr::ConsolePrint(resolve(&mut nr, val))
+                            mir::Instr::ConsolePrint(resolve(&mut nr, regs, val))
                         }
                         mir::Instr::ConsoleInput(reg) => {
                             let new_reg = regs.create();
@@ -285,7 +329,7 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                         mir::Instr::Store { dest, val } => {
                             let new_reg = regs.create();
 
-                            let val = resolve(&mut nr, val);
+                            let val = resolve(&mut nr, regs, val);
                             nr.insert(dest, new_reg);
                             mir::Instr::Store { dest: new_reg, val }
                         }
@@ -295,8 +339,8 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                             left,
                             right,
                         } => {
-                            let left = resolve(&mut nr, left);
-                            let right = resolve(&mut nr, right);
+                            let left = resolve(&mut nr, regs, left);
+                            let right = resolve(&mut nr, regs, right);
                             let new_reg = regs.create();
                             nr.insert(dest, new_reg);
                             mir::Instr::BinOp {
@@ -308,8 +352,6 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                         }
                     })
                 }
-
-                dbg!(&nr);
 
                 block_mapping.insert(block_id, new_id);
 
@@ -326,9 +368,13 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                     mir::Terminator::ProgramExit => (),
                 }
 
-                queue.push_back(Action::Commit(block_id, block, &old_block.term, nr));
+                names.insert(block_id, nr);
+                block_args.insert(block_id, current_block_args);
+                queue.push_back(Action::Commit(new_id, block, &old_block.term));
             }
-            Action::Commit(block_id, block, term, mut nr) => {
+            Action::Commit(block_id, block, term) => {
+                let mut nr = names.remove(&block_id).unwrap();
+                let mut current_block_args = block_args.remove(&block_id).unwrap();
                 let term = match term {
                     mir::Terminator::Jump(next) => {
                         mir::Terminator::Jump(mir::BasicBlockRef::new(block_mapping[&next.id]))
@@ -338,7 +384,14 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                         if_true,
                         if_false,
                     } => {
-                        let cond = make_resolve(block_id)(&mut nr, *cond);
+                        let cond = resolve(
+                            block_id,
+                            &names,
+                            &mut current_block_args,
+                            regs,
+                            &mut nr,
+                            *cond,
+                        );
                         mir::Terminator::If {
                             cond,
                             if_true: mir::BasicBlockRef::new(block_mapping[&if_true.id]),
@@ -349,14 +402,53 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                 };
 
                 names.insert(block_id, nr);
+                if !current_block_args.is_empty() {
+                    block_args.insert(block_id, current_block_args);
+                }
                 builder.commit(block, term);
             }
         }
     }
 
-    dbg!(dom_frontier);
+    for (block_id, block_args) in block_args {
+        let block_id = block_mapping[&block_id];
+        let bb = builder.blocks.get_mut(&block_id).unwrap();
 
-    todo!()
+        for &(reg, _) in &block_args {
+            bb.args.push(Some(reg));
+        }
+
+        for (_, sources) in block_args {
+            for (other_block_id, source_reg) in sources {
+                let bb = builder
+                    .blocks
+                    .get_mut(&block_mapping[&other_block_id])
+                    .unwrap();
+
+                match &mut bb.term {
+                    mir::Terminator::Jump(next) => {
+                        assert_eq!(next.id, block_id);
+                        next.args.push(mir::Val::Reg(source_reg));
+                    }
+                    mir::Terminator::If {
+                        cond: _,
+                        if_true,
+                        if_false,
+                    } => {
+                        if if_true.id == block_id {
+                            if_true.args.push(mir::Val::Reg(source_reg));
+                        } else {
+                            assert_eq!(if_false.id, block_id);
+                            if_false.args.push(mir::Val::Reg(source_reg));
+                        }
+                    }
+                    mir::Terminator::ProgramExit => unreachable!(),
+                }
+            }
+        }
+    }
+
+    builder.finish()
 }
 
 enum Action<'a> {
@@ -365,7 +457,6 @@ enum Action<'a> {
         mir::BasicBlockId,
         mir::BasicBlockBuilder,
         &'a mir::Terminator,
-        HashMap<mir::Reg, mir::Reg>,
     ),
 }
 
