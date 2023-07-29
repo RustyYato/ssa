@@ -1,0 +1,13 @@
+start bb1
+bb1
+    r1 = cmp(=, 0, 1)
+    r2 = r1
+    if r2 bb2 bb3
+bb2
+    print 0
+    jmp bb4
+bb3
+    print 1
+    jmp bb4
+bb4
+    exit

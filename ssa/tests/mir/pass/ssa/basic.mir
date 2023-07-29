@@ -1,0 +1,4 @@
+start bb1
+bb1
+    print 0
+    exit
