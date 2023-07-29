@@ -203,7 +203,7 @@ impl<'a> SsaBuilder<'a> {
     fn visit(&mut self, block_id: mir::BasicBlockId) {
         if !self.visited.contains(block_id.to_usize()) {
             self.visited.insert(block_id.to_usize());
-            self.queue.push_back(Action::Process(block_id));
+            self.queue.push_back(Action::MakeBlockSsa(block_id));
         }
     }
 
@@ -234,126 +234,133 @@ impl<'a> SsaBuilder<'a> {
     }
 
     fn make_ssa(&mut self, mir: &'a mir::Mir) {
-        let mut names = HashMap::new();
-
+        self.visit(mir.start);
         while let Some(action) = self.queue.pop_front() {
             match action {
-                Action::Process(block_id) => {
-                    let mut nr = HashMap::new();
-
-                    let mut block_args = Vec::new();
-
-                    if let Some(args) = self.block_args.get(&block_id) {
-                        block_args.reserve(args.len());
-                        for &(reg, new_reg) in args {
-                            nr.insert(reg, new_reg);
-                            block_args.push(new_reg);
-                        }
-                    }
-
-                    let old_block = &mir.blocks[&block_id];
-                    let (new_id, mut block) = self.builder.new_block();
-
-                    let mut regs = self.final_name_assginments[&block_id].0.clone();
-
-                    for &instr in &old_block.instrs {
-                        block.instrs.push(match instr {
-                            // drop elaboration should run before conversion to ssa
-                            mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
-
-                            mir::Instr::ConsolePrint(val) => {
-                                mir::Instr::ConsolePrint(self.resolve(&nr, block_id, val))
-                            }
-                            mir::Instr::ConsoleInput(reg) => {
-                                let new_reg = regs.create();
-                                nr.insert(reg, new_reg);
-                                mir::Instr::ConsoleInput(new_reg)
-                            }
-                            mir::Instr::Store { dest, val } => {
-                                let new_reg = regs.create();
-
-                                let val = self.resolve(&nr, block_id, val);
-                                nr.insert(dest, new_reg);
-                                mir::Instr::Store { dest: new_reg, val }
-                            }
-                            mir::Instr::BinOp {
-                                op,
-                                dest,
-                                left,
-                                right,
-                            } => {
-                                let left = self.resolve(&nr, block_id, left);
-                                let right = self.resolve(&nr, block_id, right);
-                                let new_reg = regs.create();
-                                nr.insert(dest, new_reg);
-                                mir::Instr::BinOp {
-                                    op,
-                                    dest: new_reg,
-                                    left,
-                                    right,
-                                }
-                            }
-                        })
-                    }
-
-                    self.block_mapping.insert(block_id, new_id);
-
-                    match &old_block.term {
-                        mir::Terminator::Jump(next) => self.visit(next.id),
-                        mir::Terminator::If {
-                            cond: _,
-                            if_true,
-                            if_false,
-                        } => {
-                            self.visit(if_true.id);
-                            self.visit(if_false.id);
-                        }
-                        mir::Terminator::ProgramExit => (),
-                    }
-
-                    names.insert(new_id, nr);
-                    block.args = block_args;
-                    self.queue
-                        .push_back(Action::Commit(new_id, block_id, block, &old_block.term));
-                }
-                Action::Commit(block_id, old_block_id, block, term) => {
-                    let nr = names.remove(&block_id).unwrap();
-                    let source = |id: mir::BasicBlockId| -> mir::BasicBlockRef {
-                        let args = if let Some(args) = self.block_args.get(&id) {
-                            let mut new_args = Vec::new();
-                            for &(arg, _new_reg) in args {
-                                new_args.push(mir::Val::Reg(self.resolve_register(&nr, id, arg)));
-                            }
-                            new_args
-                        } else {
-                            Vec::new()
-                        };
-                        let block_id = self.block_mapping[&id];
-
-                        mir::BasicBlockRef { id: block_id, args }
-                    };
+                Action::MakeBlockSsa(block_id) => self.make_block_ssa(mir, block_id),
+                Action::CommitBlock {
+                    old_id: old_block_id,
+                    block,
+                    ref nr,
+                    term,
+                } => {
                     let term = match term {
-                        mir::Terminator::Jump(next) => mir::Terminator::Jump(source(next.id)),
+                        mir::Terminator::Jump(next) => {
+                            mir::Terminator::Jump(self.create_block_ref(next.id, nr))
+                        }
                         mir::Terminator::If {
                             cond,
                             if_true,
                             if_false,
-                        } => {
-                            let cond = self.resolve(&nr, old_block_id, *cond);
-                            mir::Terminator::If {
-                                cond,
-                                if_true: source(if_true.id),
-                                if_false: source(if_false.id),
-                            }
-                        }
+                        } => mir::Terminator::If {
+                            cond: self.resolve(nr, old_block_id, *cond),
+                            if_true: self.create_block_ref(if_true.id, nr),
+                            if_false: self.create_block_ref(if_false.id, nr),
+                        },
                         mir::Terminator::ProgramExit => mir::Terminator::ProgramExit,
                     };
 
-                    names.insert(block_id, nr);
                     self.builder.commit(block, term);
                 }
             }
         }
+    }
+
+    fn make_block_ssa(&mut self, mir: &'a mir::Mir, block_id: mir::BasicBlockId) {
+        let mut nr = HashMap::new();
+
+        let mut block_args = Vec::new();
+
+        if let Some(args) = self.block_args.get(&block_id) {
+            block_args.reserve(args.len());
+            for &(reg, new_reg) in args {
+                nr.insert(reg, new_reg);
+                block_args.push(new_reg);
+            }
+        }
+
+        let old_block = &mir.blocks[&block_id];
+        let (new_id, mut block) = self.builder.new_block();
+
+        let mut regs = self.final_name_assginments[&block_id].0.clone();
+
+        for &instr in &old_block.instrs {
+            block.instrs.push(match instr {
+                // drop elaboration should run before conversion to ssa
+                mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
+
+                mir::Instr::ConsolePrint(val) => {
+                    mir::Instr::ConsolePrint(self.resolve(&nr, block_id, val))
+                }
+                mir::Instr::ConsoleInput(reg) => {
+                    let new_reg = regs.create();
+                    nr.insert(reg, new_reg);
+                    mir::Instr::ConsoleInput(new_reg)
+                }
+                mir::Instr::Store { dest, val } => {
+                    let new_reg = regs.create();
+
+                    let val = self.resolve(&nr, block_id, val);
+                    nr.insert(dest, new_reg);
+                    mir::Instr::Store { dest: new_reg, val }
+                }
+                mir::Instr::BinOp {
+                    op,
+                    dest,
+                    left,
+                    right,
+                } => {
+                    let left = self.resolve(&nr, block_id, left);
+                    let right = self.resolve(&nr, block_id, right);
+                    let new_reg = regs.create();
+                    nr.insert(dest, new_reg);
+                    mir::Instr::BinOp {
+                        op,
+                        dest: new_reg,
+                        left,
+                        right,
+                    }
+                }
+            })
+        }
+
+        self.block_mapping.insert(block_id, new_id);
+
+        match &old_block.term {
+            mir::Terminator::Jump(next) => self.visit(next.id),
+            mir::Terminator::If {
+                cond: _,
+                if_true,
+                if_false,
+            } => {
+                self.visit(if_true.id);
+                self.visit(if_false.id);
+            }
+            mir::Terminator::ProgramExit => (),
+        }
+
+        block.args = block_args;
+        self.queue.push_back(Action::CommitBlock {
+            old_id: block_id,
+            block,
+            nr,
+            term: &old_block.term,
+        });
+    }
+
+    fn create_block_ref(&self, id: mir::BasicBlockId, nr: &Reg2Reg) -> mir::BasicBlockRef {
+        let args = if let Some(args) = self.block_args.get(&id) {
+            let mut new_args = Vec::new();
+            for &(arg, _new_reg) in args {
+                new_args.push(mir::Val::Reg(self.resolve_register(nr, id, arg)));
+            }
+            new_args
+        } else {
+            Vec::new()
+        };
+        let block_id = self.block_mapping[&id];
+
+        mir::BasicBlockRef { id: block_id, args }
     }
 }
 
@@ -450,7 +457,7 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
         }
     }
 
-    let mut resolver = SsaBuilder {
+    let mut ssa_builder = SsaBuilder {
         final_name_assginments: &variables,
         dominators,
 
@@ -462,29 +469,19 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
         visited: graph.visit_map(),
     };
 
-    resolver.visit(mir.start);
-    resolver.make_ssa(mir);
+    ssa_builder.make_ssa(mir);
 
-    resolver.builder.finish()
+    ssa_builder.builder.finish()
 }
 
 enum Action<'a> {
-    Process(mir::BasicBlockId),
-    Commit(
-        mir::BasicBlockId,
-        mir::BasicBlockId,
-        mir::BasicBlockBuilder,
-        &'a mir::Terminator,
-    ),
-}
-
-impl Debug for Action<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Process(arg0) => f.debug_tuple("Process").field(arg0).finish(),
-            Self::Commit(arg0, ..) => f.debug_tuple("Commit").field(arg0).finish(),
-        }
-    }
+    MakeBlockSsa(mir::BasicBlockId),
+    CommitBlock {
+        old_id: mir::BasicBlockId,
+        block: mir::BasicBlockBuilder,
+        nr: Reg2Reg,
+        term: &'a mir::Terminator,
+    },
 }
 
 fn calculate_block_args(
