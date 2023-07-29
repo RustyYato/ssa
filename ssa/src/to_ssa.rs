@@ -383,9 +383,9 @@ impl<'a> SsaBuilder<'a> {
                     names.insert(new_id, nr);
                     block_args.insert(new_id, current_block_args);
                     self.queue
-                        .push_back(Action::Commit(new_id, block, &old_block.term));
+                        .push_back(Action::Commit(new_id, block_id, block, &old_block.term));
                 }
-                Action::Commit(block_id, block, term) => {
+                Action::Commit(block_id, old_block_id, block, term) => {
                     let mut nr = names.remove(&block_id).unwrap();
                     let mut current_block_args = block_args.remove(&block_id).unwrap();
                     let term = match term {
@@ -398,7 +398,7 @@ impl<'a> SsaBuilder<'a> {
                             if_false,
                         } => {
                             let cond =
-                                self.resolve(&mut nr, &mut current_block_args, block_id, *cond);
+                                self.resolve(&mut nr, &mut current_block_args, old_block_id, *cond);
                             mir::Terminator::If {
                                 cond,
                                 if_true: mir::BasicBlockRef::new(self.block_mapping[&if_true.id]),
@@ -588,6 +588,7 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
 enum Action<'a> {
     Process(mir::BasicBlockId),
     Commit(
+        mir::BasicBlockId,
         mir::BasicBlockId,
         mir::BasicBlockBuilder,
         &'a mir::Terminator,
