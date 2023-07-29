@@ -1,6 +1,7 @@
 use colorz::{ansi::AnsiColor, Colorize};
 use rayon::prelude::*;
 use std::{
+    backtrace::Backtrace,
     collections::{BinaryHeap, LinkedList},
     ffi::OsStr,
     io::{self, Write},
@@ -123,6 +124,7 @@ Counts! {
     regen
     save
     fail
+    panic
     new
     pass
     ignore
@@ -131,6 +133,7 @@ Counts! {
 
 #[derive(Debug)]
 enum TestResult {
+    Panic(Option<(String, Backtrace)>),
     Regen,
     Save,
     Fail { found: String },
@@ -141,6 +144,7 @@ enum TestResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum TestResultKind {
+    Panic,
     Regen,
     Save,
     Fail,
@@ -158,6 +162,7 @@ struct TestOutput {
 impl TestResult {
     fn kind(&self) -> TestResultKind {
         match self {
+            TestResult::Panic(_) => TestResultKind::Panic,
             TestResult::Ignore => TestResultKind::Ignore,
             TestResult::Pass => TestResultKind::Pass,
             TestResult::New(_) => TestResultKind::New,
@@ -236,6 +241,11 @@ fn read_var(var: &str) -> bool {
     }
 }
 
+thread_local! {
+    static PANIC_MESSAGE: std::cell::Cell<Option<(String, Backtrace)>> =
+        const { std::cell::Cell::new(None) }
+}
+
 pub fn run_tests() -> std::io::Result<()> {
     let start = std::time::Instant::now();
 
@@ -301,6 +311,13 @@ pub fn run_tests() -> std::io::Result<()> {
         *lock += 1;
     };
 
+    let panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|panic_info| {
+        PANIC_MESSAGE.with(|panic_message| {
+            panic_message.set(Some((panic_info.to_string(), Backtrace::capture())))
+        })
+    }));
+
     let (test_groups, counts) = tests
         .into_par_iter()
         .map(|mut test| {
@@ -314,7 +331,24 @@ pub fn run_tests() -> std::io::Result<()> {
                     }
                 })?;
 
-            match (test.source.test_runner)(&test) {
+            let output = match std::panic::catch_unwind(|| (test.source.test_runner)(&test)) {
+                Ok(output) => output,
+                Err(_) => {
+                    print_dot("P".fg(AnsiColor::Magenta));
+
+                    let panic_message = PANIC_MESSAGE.with(std::cell::Cell::take);
+
+                    return Ok((
+                        Some(TestOutput {
+                            res: TestResult::Panic(panic_message),
+                            test,
+                        }),
+                        Counts::panic(),
+                    ));
+                }
+            };
+
+            match output {
                 Err(err) => Err(err),
                 Ok(MaybeIgnore::Ignore) => {
                     print_dot(".".fg(AnsiColor::BrightBlack));
@@ -394,6 +428,8 @@ pub fn run_tests() -> std::io::Result<()> {
             },
         )?;
 
+    std::panic::set_hook(panic_hook);
+
     println!();
     println!();
 
@@ -403,6 +439,7 @@ pub fn run_tests() -> std::io::Result<()> {
         regen,
         save,
         fail,
+        panic,
         new,
         pass,
         ignore,
@@ -413,6 +450,7 @@ pub fn run_tests() -> std::io::Result<()> {
     ignore.print("tests ignored".bright_black());
     regen.print("tests regenerated".magenta());
     fail.print("tests failed".red());
+    panic.print("tests panicked".magenta());
     save.print("tests saved".blue());
     pass.print("tests passed".green());
     new.print("new tests".bright_cyan());
@@ -557,6 +595,21 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
                     println!("{}", found);
                 }
                 println!()
+            }
+            TestResult::Panic(message) => {
+                println!(
+                    "{} test: [{}] {}",
+                    "Panicked".magenta(),
+                    output.test.source.name.magenta(),
+                    output.test.path.display().magenta()
+                );
+
+                if let Some((message, backtrace)) = message {
+                    println!("{message}");
+                    println!("{backtrace}")
+                } else {
+                    println!("{}", "~~ panic backtrace is missing ~~".bright_magenta());
+                }
             }
         }
     }
