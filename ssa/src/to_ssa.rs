@@ -365,6 +365,14 @@ impl<'a> SsaBuilder<'a> {
 }
 
 pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
+    to_ssa_::<false>(mir)
+}
+
+pub fn to_ssa_stable(mir: &mir::Mir) -> mir::Mir {
+    to_ssa_::<true>(mir)
+}
+
+fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
     assert!(!mir.is_ssa);
 
     let mut variables = HashMap::new();
@@ -382,14 +390,20 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
     let mut max_block_id = mir::BasicBlockId::normal_start();
 
     // stablize output
-    let mut blocks = Vec::from_iter(
-        mir.blocks
-            .iter()
-            .map(|(&block_id, block)| (block_id, block)),
-    );
-    blocks.sort_unstable();
+    let blocks = mir
+        .blocks
+        .iter()
+        .map(|(&block_id, block)| (block_id, block));
 
-    for (block_id, block) in blocks {
+    let blocks = if STABLE_OUTPUT {
+        let mut blocks = Vec::from_iter(blocks);
+        blocks.sort_unstable();
+        either::Left(blocks.into_iter())
+    } else {
+        either::Right(blocks)
+    };
+
+    blocks.for_each(|(block_id, block)| {
         let block_regs = regs.clone();
         let mut block_vars = HashMap::new();
         for &instr in &block.instrs {
@@ -428,7 +442,7 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
             }
             mir::Terminator::ProgramExit => (),
         }
-    }
+    });
 
     let predecessors = &predecessors;
 

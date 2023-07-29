@@ -77,7 +77,7 @@ test_source! {
             Err(err) => Ok(MaybeIgnore::Failed(format!("encoding error: {err}"))),
             Ok(mut mir) => {
                 ssa::mir_opts::clean_up_jumps(&mut mir);
-                let mir = ssa::to_ssa::to_ssa(&mir);
+                let mir = ssa::to_ssa::to_ssa_stable(&mir);
                 let mir = ssa::mir::StableDisplayMir::from(mir);
                 Ok(MaybeIgnore::Ran(format!("{mir}")))
             }
