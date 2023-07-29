@@ -47,7 +47,7 @@ impl core::fmt::Display for StableDisplayMir {
 }
 
 #[derive(Debug)]
-pub struct MirBuilder {
+pub(crate) struct MirBuilder {
     next_id: u32,
     blocks: HashMap<BasicBlockId, BasicBlock>,
 }
@@ -102,7 +102,7 @@ impl Default for MirBuilder {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BasicBlockBuilder {
+pub(crate) struct BasicBlockBuilder {
     id: BasicBlockId,
     pub args: Vec<Reg>,
     pub instrs: Vec<Instr>,
