@@ -41,9 +41,28 @@ fn main() -> eyre::Result<()> {
     println!("{0:=>18} OPT MIR {0:=>18}", "");
     println!("{smir}");
 
+    println!("digraph basic_blocks {{");
+    for (&block_id, block) in mir.blocks() {
+        match &block.term {
+            ssa::mir::Terminator::Jump(next) => {
+                println!("{block_id} -> {}", next.id);
+            }
+            ssa::mir::Terminator::If {
+                cond: _,
+                if_true,
+                if_false,
+            } => {
+                println!("{block_id} -> {}", if_true.id);
+                println!("{block_id} -> {}", if_false.id);
+            }
+            ssa::mir::Terminator::ProgramExit => (),
+        }
+    }
+    println!("}}");
+
     let mir = ssa::to_ssa::to_ssa(&mir);
 
-    let smir = ssa::mir::StableDisplayMir::from(mir);
+    let smir = ssa::mir::StableDisplayMir::from(mir.clone());
     println!("{0:=>20} SSA {0:=>20}", "");
     println!("{smir}");
 

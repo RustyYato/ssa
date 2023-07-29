@@ -6,7 +6,7 @@ use crate::mir;
 
 use petgraph::{
     adj, data,
-    visit::{self, IntoNeighbors, IntoNodeIdentifiers, Visitable},
+    visit::{self, Visitable},
 };
 
 #[derive(Clone, Copy)]
@@ -185,24 +185,18 @@ impl<'a> visit::IntoNeighborsDirected for MirGraph<'a> {
 
 type Reg2Reg = HashMap<mir::Reg, mir::Reg>;
 type BlockMap<T> = HashMap<mir::BasicBlockId, T>;
-type BlockArgs = Vec<(mir::Reg, Vec<(mir::BasicBlockId, mir::Reg)>)>;
 
 struct SsaBuilder<'a> {
     final_name_assginments: &'a BlockMap<(mir::RegAllocator, Reg2Reg)>,
-    predecessors: &'a BlockMap<Vec<mir::BasicBlockId>>,
     dominators: &'a petgraph::algo::dominators::Dominators<NodeId>,
-    is_part_of_cycle: &'a fixedbitset::FixedBitSet,
+    block_args: &'a BlockMap<Vec<(mir::Reg, mir::Reg)>>,
 
     builder: mir::MirBuilder,
-    regs: mir::RegAllocator,
 
     block_mapping: BlockMap<mir::BasicBlockId>,
 
     queue: VecDeque<Action<'a>>,
     visited: fixedbitset::FixedBitSet,
-
-    resolve_visited: HashSet<mir::BasicBlockId>,
-    resolve_stack: Vec<mir::BasicBlockId>,
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -213,105 +207,49 @@ impl<'a> SsaBuilder<'a> {
         }
     }
 
-    fn resolve(
-        &mut self,
-        nr: &mut Reg2Reg,
-        block_args: &mut BlockArgs,
-        block_id: mir::BasicBlockId,
-        val: mir::Val,
-    ) -> mir::Val {
+    fn resolve(&self, nr: &Reg2Reg, block_id: mir::BasicBlockId, val: mir::Val) -> mir::Val {
         let reg = match val {
             mir::Val::ConstI32(_) | mir::Val::ConstBool(_) => return val,
             mir::Val::Reg(reg) => reg,
         };
 
-        let is_part_of_cycle = self.is_part_of_cycle.contains(block_id.to_usize());
-
-        if let Some(&name) = nr.get(&reg) {
-            return mir::Val::Reg(name);
-        }
-
-        let NodeId(dom) = self
-            .dominators
-            .immediate_dominator(NodeId(block_id))
-            .unwrap();
-
-        let of_dominator = self
-            .dominators
-            .dominators(NodeId(block_id))
-            .unwrap()
-            .find_map(|NodeId(bb)| {
-                let reg = self.final_name_assginments[&bb].1.get(&reg).copied();
-                Some(bb).zip(reg)
-            })
-            .unwrap();
-
-        let mut other_branches = Vec::new();
-        self.resolve_visited.clear();
-        self.resolve_stack.clear();
-
-        let pred = &self.predecessors[&block_id];
-        self.resolve_stack.clone_from(pred);
-
-        if is_part_of_cycle {
-            self.resolve_visited.insert(block_id);
-            self.resolve_stack.push(block_id);
-        }
-
-        self.resolve_visited.extend(pred);
-
-        // use a fix-point search up to the dominator to capture all
-        // possible sources for reg.
-        while let Some(bb) = self.resolve_stack.pop() {
-            let x = self.final_name_assginments[&bb].1.get(&reg).copied();
-
-            if let Some(x) = x {
-                // if the current node contains an assignment to the regsiter
-                // collect that assignment
-                // this is one base case
-                other_branches.push((bb, x));
-            } else {
-                // if the node isn't a dominator, then walk the predecessors to collect any
-                // assignments in there too
-                // this is one base case
-
-                for &bb in &self.predecessors[&bb][..] {
-                    if bb == dom {
-                        continue;
-                    }
-
-                    if self.resolve_visited.insert(bb) {
-                        self.resolve_stack.push(bb);
-                    }
-                }
-            }
-        }
-
-        let (dom, dom_reg) = of_dominator;
-
-        mir::Val::Reg(if other_branches.is_empty() {
-            dom_reg
-        } else {
-            let new_reg = self.regs.create();
-
-            other_branches.push((dom, dom_reg));
-            nr.insert(reg, new_reg);
-            block_args.push((new_reg, other_branches));
-
-            new_reg
-        })
+        mir::Val::Reg(self.resolve_register(nr, block_id, reg))
     }
 
-    fn make_ssa(&mut self, mir: &'a mir::Mir) -> BlockMap<BlockArgs> {
+    fn resolve_register(
+        &self,
+        nr: &Reg2Reg,
+        block_id: mir::BasicBlockId,
+        reg: mir::Reg,
+    ) -> mir::Reg {
+        if let Some(&reg) = nr.get(&reg) {
+            return reg;
+        }
+
+        self.dominators
+            .strict_dominators(NodeId(block_id))
+            .unwrap()
+            .find_map(|NodeId(bb)| self.final_name_assginments[&bb].1.get(&reg).copied())
+            .unwrap()
+    }
+
+    fn make_ssa(&mut self, mir: &'a mir::Mir) {
         let mut names = HashMap::new();
-        let mut block_args = HashMap::new();
 
         while let Some(action) = self.queue.pop_front() {
             match action {
                 Action::Process(block_id) => {
-                    let mut current_block_args = BlockArgs::default();
-
                     let mut nr = HashMap::new();
+
+                    let mut block_args = Vec::new();
+
+                    if let Some(args) = self.block_args.get(&block_id) {
+                        block_args.reserve(args.len());
+                        for &(reg, new_reg) in args {
+                            nr.insert(reg, new_reg);
+                            block_args.push(new_reg);
+                        }
+                    }
 
                     let old_block = &mir.blocks[&block_id];
                     let (new_id, mut block) = self.builder.new_block();
@@ -323,9 +261,9 @@ impl<'a> SsaBuilder<'a> {
                             // drop elaboration should run before conversion to ssa
                             mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
 
-                            mir::Instr::ConsolePrint(val) => mir::Instr::ConsolePrint(
-                                self.resolve(&mut nr, &mut current_block_args, block_id, val),
-                            ),
+                            mir::Instr::ConsolePrint(val) => {
+                                mir::Instr::ConsolePrint(self.resolve(&nr, block_id, val))
+                            }
                             mir::Instr::ConsoleInput(reg) => {
                                 let new_reg = regs.create();
                                 nr.insert(reg, new_reg);
@@ -334,8 +272,7 @@ impl<'a> SsaBuilder<'a> {
                             mir::Instr::Store { dest, val } => {
                                 let new_reg = regs.create();
 
-                                let val =
-                                    self.resolve(&mut nr, &mut current_block_args, block_id, val);
+                                let val = self.resolve(&nr, block_id, val);
                                 nr.insert(dest, new_reg);
                                 mir::Instr::Store { dest: new_reg, val }
                             }
@@ -345,10 +282,8 @@ impl<'a> SsaBuilder<'a> {
                                 left,
                                 right,
                             } => {
-                                let left =
-                                    self.resolve(&mut nr, &mut current_block_args, block_id, left);
-                                let right =
-                                    self.resolve(&mut nr, &mut current_block_args, block_id, right);
+                                let left = self.resolve(&nr, block_id, left);
+                                let right = self.resolve(&nr, block_id, right);
                                 let new_reg = regs.create();
                                 nr.insert(dest, new_reg);
                                 mir::Instr::BinOp {
@@ -377,90 +312,45 @@ impl<'a> SsaBuilder<'a> {
                     }
 
                     names.insert(new_id, nr);
-                    block_args.insert(new_id, current_block_args);
+                    block.args = block_args;
                     self.queue
                         .push_back(Action::Commit(new_id, block_id, block, &old_block.term));
                 }
                 Action::Commit(block_id, old_block_id, block, term) => {
-                    let mut nr = names.remove(&block_id).unwrap();
-                    let mut current_block_args = block_args.remove(&block_id).unwrap();
+                    let nr = names.remove(&block_id).unwrap();
+                    let source = |id: mir::BasicBlockId| -> mir::BasicBlockRef {
+                        let args = if let Some(args) = self.block_args.get(&id) {
+                            let mut new_args = Vec::new();
+                            for &(arg, _new_reg) in args {
+                                new_args.push(mir::Val::Reg(self.resolve_register(&nr, id, arg)));
+                            }
+                            new_args
+                        } else {
+                            Vec::new()
+                        };
+                        let block_id = self.block_mapping[&id];
+
+                        mir::BasicBlockRef { id: block_id, args }
+                    };
                     let term = match term {
-                        mir::Terminator::Jump(next) => mir::Terminator::Jump(
-                            mir::BasicBlockRef::new(self.block_mapping[&next.id]),
-                        ),
+                        mir::Terminator::Jump(next) => mir::Terminator::Jump(source(next.id)),
                         mir::Terminator::If {
                             cond,
                             if_true,
                             if_false,
                         } => {
-                            let cond =
-                                self.resolve(&mut nr, &mut current_block_args, old_block_id, *cond);
+                            let cond = self.resolve(&nr, old_block_id, *cond);
                             mir::Terminator::If {
                                 cond,
-                                if_true: mir::BasicBlockRef::new(self.block_mapping[&if_true.id]),
-                                if_false: mir::BasicBlockRef::new(self.block_mapping[&if_false.id]),
+                                if_true: source(if_true.id),
+                                if_false: source(if_false.id),
                             }
                         }
                         mir::Terminator::ProgramExit => mir::Terminator::ProgramExit,
                     };
 
                     names.insert(block_id, nr);
-                    if !current_block_args.is_empty() {
-                        block_args.insert(block_id, current_block_args);
-                    }
                     self.builder.commit(block, term);
-                }
-            }
-        }
-
-        block_args
-    }
-
-    fn insert_block_args(&mut self, block_args: BlockMap<BlockArgs>) {
-        dbg!(&block_args);
-        dbg!(&self.block_mapping);
-        for (block_id, mut block_args) in block_args {
-            // let block_id = self.block_mapping[&block_id];
-            let bb = self.builder.blocks.get_mut(&block_id).unwrap();
-
-            for (_, sources) in &mut block_args {
-                sources.sort_unstable();
-                sources.dedup();
-            }
-            block_args.sort_unstable();
-
-            dbg!((block_id, &block_args));
-
-            for &(reg, _) in &block_args {
-                bb.args.push(Some(reg));
-            }
-
-            for (_, sources) in block_args {
-                for (other_block_id, source_reg) in sources {
-                    let bb: &mut mir::BasicBlock = self
-                        .builder
-                        .blocks
-                        .get_mut(&self.block_mapping[&other_block_id])
-                        .unwrap();
-
-                    match &mut bb.term {
-                        mir::Terminator::Jump(next) => {
-                            next.args.push(mir::Val::Reg(source_reg));
-                        }
-                        mir::Terminator::If {
-                            cond: _,
-                            if_true,
-                            if_false,
-                        } => {
-                            if if_true.id == block_id {
-                                if_true.args.push(mir::Val::Reg(source_reg));
-                            } else {
-                                assert_eq!(if_false.id, block_id);
-                                if_false.args.push(mir::Val::Reg(source_reg));
-                            }
-                        }
-                        mir::Terminator::ProgramExit => unreachable!(),
-                    }
                 }
             }
         }
@@ -469,15 +359,6 @@ impl<'a> SsaBuilder<'a> {
 
 pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
     assert!(!mir.is_ssa);
-
-    // FIXME: build SSA representation in two passes
-    // First pass goes through each block and assigns registers to each of
-    // the written to. These will be tracked by using the mapping (block id, instr id) -> new reg
-    // to key each assignment, or we could just store (block id, Vec<new reg>)
-    // where each instruction is visited in the same order
-    //
-    // in the second pass, use this generated list to resolve ids, potentially recursively
-    // to the same block to ensure that cycles are taken care of
 
     let mut variables = HashMap::new();
     let mut regs = mir::RegAllocator::new();
@@ -492,7 +373,16 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
     };
 
     let mut max_block_id = mir::BasicBlockId::normal_start();
-    for (&block_id, block) in mir.blocks.iter() {
+
+    // stablize output
+    let mut blocks = Vec::from_iter(
+        mir.blocks
+            .iter()
+            .map(|(&block_id, block)| (block_id, block)),
+    );
+    blocks.sort_unstable();
+
+    for (block_id, block) in blocks {
         let block_regs = regs.clone();
         let mut block_vars = HashMap::new();
         for &instr in &block.instrs {
@@ -533,7 +423,6 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
         }
     }
 
-    let variables = &variables;
     let predecessors = &predecessors;
 
     let graph = MirGraph {
@@ -543,48 +432,40 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
     };
 
     let dominators = &petgraph::algo::dominators::simple_fast(graph, NodeId(mir.start));
-    let scc = &petgraph::algo::kosaraju_scc(graph);
+    let dom_frontier = &dominator_frontier(mir, predecessors, dominators);
+    let block_args = &calculate_block_args(mir, dom_frontier, &mut regs);
 
-    let mut is_part_of_cycle = graph.visit_map();
+    // stablize output
+    let mut stable_block_args = Vec::from_iter(
+        block_args
+            .iter()
+            .map(|(&block_id, block)| (block_id, block)),
+    );
+    stable_block_args.sort_unstable();
 
-    for component in scc {
-        if component.len() <= 1 {
-            continue;
-        }
-
-        for &NodeId(bb) in component {
-            is_part_of_cycle.insert(bb.to_usize());
+    for (block_id, args) in stable_block_args {
+        let (_regs, variables) = variables.get_mut(&block_id).unwrap();
+        for &(arg, new_reg) in args {
+            variables.entry(arg).or_insert(new_reg);
         }
     }
 
-    let is_part_of_cycle = &is_part_of_cycle;
-
     let mut resolver = SsaBuilder {
-        final_name_assginments: variables,
-        predecessors,
+        final_name_assginments: &variables,
         dominators,
-        is_part_of_cycle,
 
+        block_args,
         block_mapping: BlockMap::default(),
 
         builder: mir::MirBuilder::default(),
-        regs,
         queue: VecDeque::new(),
         visited: graph.visit_map(),
-
-        resolve_visited: HashSet::default(),
-        resolve_stack: Vec::new(),
     };
 
-    dbg!(predecessors);
-    dbg!(scc);
-    dbg!(dominators);
     resolver.visit(mir.start);
-    let block_args = resolver.make_ssa(mir);
-    resolver.insert_block_args(block_args);
-    println!("{}", mir::StableDisplayMir::from(resolver.builder.finish()));
+    resolver.make_ssa(mir);
 
-    todo!()
+    resolver.builder.finish()
 }
 
 enum Action<'a> {
@@ -604,4 +485,119 @@ impl Debug for Action<'_> {
             Self::Commit(arg0, ..) => f.debug_tuple("Commit").field(arg0).finish(),
         }
     }
+}
+
+fn calculate_block_args(
+    mir: &mir::Mir,
+    dom_frontier: &BlockMap<Vec<mir::BasicBlockId>>,
+    regs: &mut mir::RegAllocator,
+) -> BlockMap<Vec<(mir::Reg, mir::Reg)>> {
+    // algorithm adapted from
+    // https://pages.cs.wisc.edu/~fischer/cs701.f14/lectures/L10.pdf
+    // page 18/34 (or 191 in bottom right corner)
+
+    let mut variables = HashSet::new();
+
+    let mut block_args = BlockMap::default();
+    let mut initial = HashMap::new();
+
+    for (&block_id, block) in &mir.blocks {
+        for &instr in block.instrs.iter().rev() {
+            match instr {
+                mir::Instr::EndLifetime(_) | mir::Instr::ConsolePrint(_) => (),
+                mir::Instr::ConsoleInput(dest)
+                | mir::Instr::Store { dest, val: _ }
+                | mir::Instr::BinOp {
+                    op: _,
+                    dest,
+                    left: _,
+                    right: _,
+                } => {
+                    initial
+                        .entry(dest)
+                        .or_insert_with(HashSet::new)
+                        .insert(block_id);
+                }
+                mir::Instr::StartLifetime(reg) => {
+                    // any registers created in this node can't be lifted to phi nodes
+                    // since they aren't defined before this node
+
+                    if let Some(initial) = initial.get_mut(&reg) {
+                        initial.remove(&block_id);
+                    }
+                    variables.insert(reg);
+                }
+            }
+            if let mir::Instr::StartLifetime(reg) = instr {
+                variables.insert(reg);
+            }
+        }
+    }
+
+    let mut stack = Vec::new();
+
+    for reg in variables {
+        stack.clear();
+
+        let initial = &initial[&reg];
+        stack.extend(initial);
+
+        while let Some(block_id) = stack.pop() {
+            let dom_frontier = dom_frontier
+                .get(&block_id)
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+
+            for &block_id in dom_frontier {
+                let block_args = block_args.entry(block_id).or_insert_with(Vec::new);
+
+                if block_args.iter().any(|(r, _)| *r == reg) {
+                    continue;
+                }
+
+                block_args.push((reg, regs.create()));
+
+                if !initial.contains(&block_id) {
+                    continue;
+                }
+
+                stack.push(block_id);
+            }
+        }
+    }
+
+    block_args
+}
+
+fn dominator_frontier(
+    mir: &mir::Mir,
+    predecessors: &HashMap<mir::BasicBlockId, Vec<mir::BasicBlockId>>,
+    dominators: &petgraph::algo::dominators::Dominators<NodeId>,
+) -> BlockMap<Vec<mir::BasicBlockId>> {
+    // https://en.wikipedia.org/wiki/Static_single-assignment_form#Computing_minimal_SSA_using_dominance_frontiers
+
+    let mut dom_frontier = HashMap::new();
+
+    for &block_id in mir.blocks.keys() {
+        let pred = &predecessors[&block_id][..];
+
+        if pred.len() < 2 {
+            continue;
+        }
+
+        let dom = dominators.immediate_dominator(NodeId(block_id)).unwrap().0;
+
+        for mut runner in pred.iter().copied() {
+            while runner != dom {
+                let frontier = dom_frontier.entry(runner).or_insert_with(Vec::new);
+                if !frontier.contains(&block_id) {
+                    frontier.push(block_id);
+                }
+
+                runner = dominators.immediate_dominator(NodeId(runner)).unwrap().0;
+            }
+        }
+    }
+
+    dom_frontier
 }

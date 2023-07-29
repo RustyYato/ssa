@@ -52,6 +52,13 @@ pub(crate) struct MirBuilder {
     pub(crate) blocks: HashMap<BasicBlockId, BasicBlock>,
 }
 
+impl Mir {
+    #[inline]
+    pub fn blocks(&self) -> &HashMap<BasicBlockId, BasicBlock> {
+        &self.blocks
+    }
+}
+
 impl MirBuilder {
     pub fn new() -> Self {
         Self {
@@ -108,12 +115,13 @@ pub(crate) struct BasicBlockBuilder {
     pub instrs: Vec<Instr>,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BasicBlock {
-    pub(crate) id: BasicBlockId,
-    pub(crate) args: Vec<Option<Reg>>,
-    pub(crate) instrs: Vec<Instr>,
-    pub(crate) term: Terminator,
+    pub id: BasicBlockId,
+    pub args: Vec<Option<Reg>>,
+    pub instrs: Vec<Instr>,
+    pub term: Terminator,
 }
 
 impl BasicBlock {
