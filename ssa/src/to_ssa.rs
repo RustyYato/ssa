@@ -187,15 +187,32 @@ type Reg2Reg = HashMap<mir::Reg, mir::Reg>;
 type BlockMap<T> = HashMap<mir::BasicBlockId, T>;
 
 struct SsaBuilder<'a> {
+    /// the final name assignments tell us where each register in the original
+    /// MIR ended up in the SSA-MIR at the end of each block.
+    /// and since each block doesn't have any control flow until the terminator
+    /// when resolving names, we only need to look at the final assignments to know
+    /// if a block contains the unresolved name
     final_name_assginments: &'a BlockMap<(mir::RegAllocator, Reg2Reg)>,
+
+    /// When resolving nodes, we only need to look at the current block's dominators.
     dominators: &'a petgraph::algo::dominators::Dominators<NodeId>,
+
+    /// The block arguments for each block that needs them, used to reconcile
+    /// conditional mutation.
     block_args: &'a BlockMap<Vec<(mir::Reg, mir::Reg)>>,
 
+    /// The new SSA-MIR
     builder: mir::MirBuilder,
 
+    /// A mapping of old block ids to the corrosponding new block id
     block_mapping: BlockMap<mir::BasicBlockId>,
 
+    /// A queue of actions, use to avoid recursion
+    /// An action either converts a block to SSA or commits a block after all
+    /// of it's children have been converted to SSA
     queue: VecDeque<Action<'a>>,
+
+    // The visited blocks while converting them to ssa
     visited: fixedbitset::FixedBitSet,
 }
 
@@ -222,9 +239,19 @@ impl<'a> SsaBuilder<'a> {
         block_id: mir::BasicBlockId,
         reg: mir::Reg,
     ) -> mir::Reg {
+        // if the node is written to in the current block, then just reuse that ssa-register
         if let Some(&reg) = nr.get(&reg) {
             return reg;
         }
+
+        // We only need to look at the dominators instead of all parents because
+        // any parent which doesn't strictly dominate this node has at most a conditional mutation
+        // if the parent is after immediate dominator, then that conditioanl mutation is reconciled
+        // as a block arg on the current node, which is inserted into `nr`
+        // if the parent is before the immediate dominator, then the dominator contains a block arg
+        // which will be inserted into `final_name_assginments` for that block
+        // if there is no conditional mutation, then by definition the variable must be written to
+        // in a dominator.
 
         self.dominators
             .strict_dominators(NodeId(block_id))
@@ -234,10 +261,16 @@ impl<'a> SsaBuilder<'a> {
     }
 
     fn make_ssa(&mut self, mir: &'a mir::Mir) {
+        // recurse through all the blocks starting with the start block
+        // visiting all blocks in pre-order traversal, and committing
+        // the blocks in a post-order traversal in the same loop
         self.visit(mir.start);
         while let Some(action) = self.queue.pop_front() {
             match action {
+                // this will append an action to make each child ssa and an action to commit the `block_id`
                 Action::MakeBlockSsa(block_id) => self.make_block_ssa(mir, block_id),
+
+                // Commit the block, and create reconcile block args
                 Action::CommitBlock {
                     old_id: old_block_id,
                     block,
@@ -286,12 +319,16 @@ impl<'a> SsaBuilder<'a> {
 
         for &instr in &old_block.instrs {
             block.instrs.push(match instr {
-                // drop elaboration should run before conversion to ssa
+                // drop elaboration should run before conversion to ssa but should keep these lifetime annotations in place
                 mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
 
                 mir::Instr::ConsolePrint(val) => {
                     mir::Instr::ConsolePrint(self.resolve(&nr, block_id, val))
                 }
+
+                // NOTE: the new registers should be created and inserted *after*
+                // we resolve the values, otherwise the values could in theory refer to
+                // their own definition which wouldn't work out
                 mir::Instr::ConsoleInput(reg) => {
                     let new_reg = regs.create();
                     nr.insert(reg, new_reg);
@@ -375,7 +412,7 @@ pub fn to_ssa_stable(mir: &mir::Mir) -> mir::Mir {
 fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
     assert!(!mir.is_ssa);
 
-    let mut variables = HashMap::new();
+    let mut final_name_assignments = HashMap::new();
     let mut regs = mir::RegAllocator::new();
 
     let mut predecessors = HashMap::new();
@@ -412,7 +449,8 @@ fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
                 mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
                 // no write targets
                 mir::Instr::ConsolePrint(_) => continue,
-                //
+                // one write target, create a new register
+                // to ensure that the each register is written to at most once
                 mir::Instr::ConsoleInput(reg)
                 | mir::Instr::Store { dest: reg, val: _ }
                 | mir::Instr::BinOp {
@@ -427,9 +465,13 @@ fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
             }
         }
 
-        variables.insert(block_id, (block_regs, block_vars));
+        // see SsaBuilder.final_name_assignments for details
+        final_name_assignments.insert(block_id, (block_regs, block_vars));
 
+        // track the max_block_id so that the fixedbitset can be initialized to the correct size
         max_block_id = max_block_id.max(block_id);
+
+        // track predecessor relationships, to build the dominator frontier
         match &block.term {
             mir::Terminator::Jump(next) => add_pred(next.id, block_id),
             mir::Terminator::If {
@@ -446,6 +488,7 @@ fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
 
     let predecessors = &predecessors;
 
+    // Construct a graph represetnting the mir, which it compatible with petgraph's Graph API
     let graph = MirGraph {
         mir,
         max: max_block_id,
@@ -453,24 +496,31 @@ fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
     };
 
     let dominators = &petgraph::algo::dominators::simple_fast(graph, NodeId(mir.start));
+    // the dominator frontier contains all sucessors which are not dominated the keyed block
+    // this tells us where to put block args, since these are exactly the locations where different
+    // conditional mutations must be reconciled
     let dom_frontier = &dominator_frontier(mir, predecessors, dominators);
+    // calculate the block arguments for all blocks, if needed
+    // this reconciled conditional mutations to the same register in an SSA friendly way
     let block_args = &calculate_block_args(mir, dom_frontier, &mut regs);
 
+    // Add block args to the final name assignments so that we can resolve to them
+    // This is critical to correctly reconcile loops
     for (block_id, args) in block_args {
-        let (_regs, variables) = variables.get_mut(block_id).unwrap();
+        let (_regs, block_vars) = final_name_assignments.get_mut(block_id).unwrap();
         for &(arg, new_reg) in args {
-            variables.entry(arg).or_insert(new_reg);
+            block_vars.entry(arg).or_insert(new_reg);
         }
     }
 
     let mut ssa_builder = SsaBuilder {
-        final_name_assginments: &variables,
+        final_name_assginments: &final_name_assignments,
         dominators,
-
         block_args,
-        block_mapping: BlockMap::default(),
 
+        block_mapping: BlockMap::default(),
         builder: mir::MirBuilder::default(),
+
         queue: VecDeque::new(),
         visited: graph.visit_map(),
     };
@@ -522,7 +572,7 @@ fn calculate_block_args(
                         .insert(block_id);
                 }
                 mir::Instr::StartLifetime(reg) => {
-                    // any registers created in this node can't be lifted to phi nodes
+                    // any registers created in this node can't be lifted to block args
                     // since they aren't defined before this node
 
                     if let Some(initial) = initial.get_mut(&reg) {
