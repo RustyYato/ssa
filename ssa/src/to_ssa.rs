@@ -556,7 +556,7 @@ fn calculate_block_args(
 
                 block_args.push((reg, regs.create()));
 
-                if !initial.contains(&block_id) {
+                if initial.contains(&block_id) {
                     continue;
                 }
 
