@@ -202,7 +202,7 @@ struct SsaBuilder<'a> {
     visited: fixedbitset::FixedBitSet,
 
     resolve_visited: HashSet<mir::BasicBlockId>,
-    resolve_stack: Vec<(mir::BasicBlockId, bool)>,
+    resolve_stack: Vec<mir::BasicBlockId>,
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -236,62 +236,58 @@ impl<'a> SsaBuilder<'a> {
             .immediate_dominator(NodeId(block_id))
             .unwrap();
 
-        let mut of_dominator = None;
+        let of_dominator = self
+            .dominators
+            .dominators(NodeId(block_id))
+            .unwrap()
+            .find_map(|NodeId(bb)| {
+                let reg = self.final_name_assginments[&bb].1.get(&reg).copied();
+                Some(bb).zip(reg)
+            })
+            .unwrap();
+
         let mut other_branches = Vec::new();
         self.resolve_visited.clear();
         self.resolve_stack.clear();
 
+        let pred = &self.predecessors[&block_id];
+        self.resolve_stack.clone_from(pred);
+
         if is_part_of_cycle {
             self.resolve_visited.insert(block_id);
-            self.resolve_stack.push((block_id, false));
+            self.resolve_stack.push(block_id);
         }
 
-        let pred = &self.predecessors[&block_id][..];
         self.resolve_visited.extend(pred);
-        self.resolve_stack
-            .extend(pred.iter().copied().zip(core::iter::repeat(false)));
 
         // use a fix-point search up to the dominator to capture all
         // possible sources for reg.
-        while let Some((bb, is_dom)) = self.resolve_stack.pop() {
+        while let Some(bb) = self.resolve_stack.pop() {
             let x = self.final_name_assginments[&bb].1.get(&reg).copied();
-            let is_dom = is_dom || bb == dom;
 
             if let Some(x) = x {
                 // if the current node contains an assignment to the regsiter
                 // collect that assignment
                 // this is one base case
-                if is_dom {
-                    of_dominator = Some((bb, x));
-                } else {
-                    other_branches.push((bb, x));
-                }
-            } else if is_dom {
-                //FIXME:
-                // split this out into it's own function, and call it
-                //
-
-                // but if the register isn't found in the current dominator
-                // we can skip to the previous dominator
-                // we can guaranteed that the reg won't be set in any non-dominating
-                // block of the dominator since that would imply that we placed a block arg
-                // incorrectly, which can't happen by induction (this is the inductive case)
-                let dom = self.dominators.immediate_dominator(NodeId(bb)).unwrap().0;
-                self.resolve_stack.push((dom, true));
+                other_branches.push((bb, x));
             } else {
                 // if the node isn't a dominator, then walk the predecessors to collect any
                 // assignments in there too
                 // this is one base case
 
                 for &bb in &self.predecessors[&bb][..] {
+                    if bb == dom {
+                        continue;
+                    }
+
                     if self.resolve_visited.insert(bb) {
-                        self.resolve_stack.push((bb, false));
+                        self.resolve_stack.push(bb);
                     }
                 }
             }
         }
 
-        let (dom, dom_reg) = of_dominator.unwrap();
+        let (dom, dom_reg) = of_dominator;
 
         mir::Val::Reg(if other_branches.is_empty() {
             dom_reg
@@ -423,11 +419,17 @@ impl<'a> SsaBuilder<'a> {
     fn insert_block_args(&mut self, block_args: BlockMap<BlockArgs>) {
         dbg!(&block_args);
         dbg!(&self.block_mapping);
-        for (block_id, block_args) in block_args {
+        for (block_id, mut block_args) in block_args {
             // let block_id = self.block_mapping[&block_id];
             let bb = self.builder.blocks.get_mut(&block_id).unwrap();
 
-            dbg!(block_id);
+            for (_, sources) in &mut block_args {
+                sources.sort_unstable();
+                sources.dedup();
+            }
+            block_args.sort_unstable();
+
+            dbg!((block_id, &block_args));
 
             for &(reg, _) in &block_args {
                 bb.args.push(Some(reg));
