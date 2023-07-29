@@ -536,7 +536,9 @@ fn calculate_block_args(
     for reg in variables {
         stack.clear();
 
-        let initial = &initial[&reg];
+        let Some(initial) = initial.get(&reg) else {
+            continue;
+        };
         stack.extend(initial);
 
         while let Some(block_id) = stack.pop() {

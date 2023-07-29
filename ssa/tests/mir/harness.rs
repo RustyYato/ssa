@@ -249,6 +249,9 @@ thread_local! {
 pub fn run_tests() -> std::io::Result<()> {
     let start = std::time::Instant::now();
 
+    let filter = std::env::args().nth(1);
+    let filter = filter.as_deref();
+
     println!("    Collecting tests...");
 
     let test_save = read_var("TEST_SAVE");
@@ -266,6 +269,16 @@ pub fn run_tests() -> std::io::Result<()> {
 
             if !(source.path_matcher)(entry.path()) {
                 continue;
+            }
+
+            if let Some(filter) = filter {
+                if let Some(path) = entry.path().to_str() {
+                    if !path.contains(filter) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
             }
 
             let expected_path = (source.expected_path)(entry.path());

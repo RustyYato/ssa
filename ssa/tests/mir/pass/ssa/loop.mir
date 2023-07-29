@@ -1,0 +1,5 @@
+start bb1
+bb1
+    jmp bb2
+bb2
+    jmp bb2
