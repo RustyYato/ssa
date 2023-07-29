@@ -1,0 +1,20 @@
+start bb1
+bb1
+    input r1
+    r2 = cmp(=, r1, 0)
+    if r2 bb2 bb3
+bb2
+    r3 = 1
+    jmp bb4[r3]
+bb3
+    r4 = cmp(=, r1, 1)
+    if r4 bb5 bb6
+bb4[r7]
+    print r7
+    exit
+bb5
+    r5 = 2
+    jmp bb4[r5]
+bb6
+    r6 = 3
+    jmp bb4[r6]

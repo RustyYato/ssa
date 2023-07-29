@@ -1,0 +1,24 @@
+start bb1
+bb1
+    start_lt r1
+    input r1
+    r2 = cmp(=, r1, 0)
+    if r2 bb3 bb4
+bb2
+    print r1
+    end_lt   r1
+    exit
+bb3
+    r1 = 1
+    jmp bb2
+bb4
+    r3 = cmp(=, r1, 1)
+    if r3 bb6 bb7
+bb5
+    jmp bb2
+bb6
+    r1 = 2
+    jmp bb5
+bb7
+    r1 = 3
+    jmp bb5
