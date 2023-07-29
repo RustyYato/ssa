@@ -1,14 +1,14 @@
 start bb1
-bb1[]
-    jmp bb2[]
-bb2[]
+bb1
+    jmp bb2
+bb2
     start_lt r1
-    jmp bb4[]
-bb3[]
+    jmp bb4
+bb3
     end_lt   r1
-    jmp bb2[]
-bb4[]
+    jmp bb2
+bb4
     end_lt   r1
     exit
-bb5[]
-    jmp bb3[]
+bb5
+    jmp bb3

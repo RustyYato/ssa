@@ -1,15 +1,15 @@
 start bb1
-bb1[]
+bb1
     start_lt r1
     r2 = cmp(=, 0, 1)
     r1 = r2
-    if r1 bb3[] bb4[]
-bb2[]
+    if r1 bb3 bb4
+bb2
     end_lt   r1
     exit
-bb3[]
+bb3
     print 0
-    jmp bb2[]
-bb4[]
+    jmp bb2
+bb4
     print 1
-    jmp bb2[]
+    jmp bb2

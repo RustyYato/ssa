@@ -115,6 +115,7 @@ pub struct BasicBlock {
     pub(crate) instrs: Vec<Instr>,
     pub(crate) term: Terminator,
 }
+
 impl BasicBlock {
     pub(crate) fn invalid() -> BasicBlock {
         Self {
@@ -128,7 +129,22 @@ impl BasicBlock {
 
 impl core::fmt::Display for BasicBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}{:?}", self.id, self.args)?;
+        if self.args.is_empty() {
+            writeln!(f, "{}", self.id)?;
+        } else {
+            write!(f, "{}[", self.id)?;
+            let mut first = true;
+            for arg in &self.args {
+                if !core::mem::take(&mut first) {
+                    write!(f, ", ")?
+                }
+                match arg {
+                    Some(arg) => write!(f, "{arg}"),
+                    None => write!(f, "_"),
+                }?
+            }
+            writeln!(f, "]")?;
+        }
         for instr in &self.instrs {
             writeln!(f, "    {instr}")?
         }
@@ -306,7 +322,19 @@ impl Clone for BasicBlockRef {
 
 impl core::fmt::Display for BasicBlockRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{:?}", self.id, self.args)
+        if self.args.is_empty() {
+            write!(f, "{}", self.id)
+        } else {
+            write!(f, "{}[", self.id)?;
+            let mut first = true;
+            for arg in &self.args {
+                if !core::mem::take(&mut first) {
+                    write!(f, ", ")?
+                }
+                write!(f, "{arg}")?
+            }
+            write!(f, "]")
+        }
     }
 }
 
