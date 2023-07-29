@@ -141,6 +141,8 @@ impl visit::Visitable for MirGraph<'_> {
 }
 
 pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
+    assert!(!mir.is_ssa);
+
     let mut max_block_id = mir::BasicBlockId::normal_start();
 
     for &id in mir.blocks.keys() {
@@ -216,7 +218,11 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
 
         match action {
             Action::Process(block_id) => {
-                let resolve = |reg: mir::Reg| -> mir::Reg {
+                let resolve = |nr: &mut HashMap<mir::Reg, mir::Reg>, reg: mir::Reg| -> mir::Reg {
+                    if let Some(&name) = nr.get(&reg) {
+                        return name;
+                    }
+
                     let NodeId(dom) = dominators.immediate_dominator(NodeId(block_id)).unwrap();
                     let pred = &predessors[&block_id][..];
 
@@ -242,28 +248,29 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                     todo!()
                 };
 
+                let resolve = |nr: &mut _, val: mir::Val| -> mir::Val {
+                    match val {
+                        mir::Val::ConstI32(_) | mir::Val::ConstBool(_) => val,
+                        mir::Val::Reg(reg) => mir::Val::Reg(resolve(nr, reg)),
+                    }
+                };
+
                 let mut nr = HashMap::new();
                 let old_block = &mir.blocks[&block_id];
                 let (new_id, mut block) = builder.new_block();
 
                 for &instr in &old_block.instrs {
-                    match instr {
+                    block.instrs.push(match instr {
                         // drop elaboration should run before conversion to ssa
-                        mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => (),
+                        mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
 
                         mir::Instr::ConsolePrint(val) => {
-                            dbg!(val);
-                            let val = match val {
-                                mir::Val::ConstI32(_) | mir::Val::ConstBool(_) => val,
-                                mir::Val::Reg(reg) => mir::Val::Reg(resolve(reg)),
-                            };
-
-                            block.instrs.push(mir::Instr::ConsolePrint(val));
+                            mir::Instr::ConsolePrint(resolve(&mut nr, val))
                         }
                         mir::Instr::ConsoleInput(reg) => {
                             let new_reg = regs.create();
                             nr.insert(reg, new_reg);
-                            block.instrs.push(mir::Instr::ConsoleInput(new_reg));
+                            mir::Instr::ConsoleInput(new_reg)
                         }
                         mir::Instr::Store { dest, val } => {
                             let new_reg = regs.create();
@@ -273,14 +280,22 @@ pub fn to_ssa(mir: &mir::Mir) -> mir::Mir {
                                 mir::Val::Reg(_) => todo!(),
                             };
                             nr.insert(dest, new_reg);
-                            block.instrs.push(mir::Instr::Store { dest: new_reg, val });
+                            mir::Instr::Store { dest: new_reg, val }
                         }
                         mir::Instr::Add { dest, left, right } => todo!(),
                         mir::Instr::Mul { dest, left, right } => todo!(),
                         mir::Instr::Sub { dest, left, right } => todo!(),
                         mir::Instr::Div { dest, left, right } => todo!(),
-                        mir::Instr::CmpEq { dest, left, right } => todo!(),
-                    }
+                        mir::Instr::CmpEq { dest, left, right } => {
+                            let new_reg = regs.create();
+                            nr.insert(dest, new_reg);
+                            mir::Instr::CmpEq {
+                                dest: new_reg,
+                                left: resolve(&mut nr, left),
+                                right: resolve(&mut nr, right),
+                            }
+                        }
+                    })
                 }
 
                 dbg!(&nr);
