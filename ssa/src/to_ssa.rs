@@ -15,7 +15,7 @@ struct SsaBuilder<'a> {
     /// and since each block doesn't have any control flow until the terminator
     /// when resolving names, we only need to look at the final assignments to know
     /// if a block contains the unresolved name
-    final_name_assginments: &'a BlockMap<(mir::RegAllocator, Reg2Reg)>,
+    block_reg_info: &'a BlockMap<BlockNames>,
 
     /// When resolving nodes, we only need to look at the current block's dominators.
     dominators: &'a petgraph::algo::dominators::Dominators<NodeId>,
@@ -37,6 +37,99 @@ struct SsaBuilder<'a> {
 
     // The visited blocks while converting them to ssa
     visited: fixedbitset::FixedBitSet,
+}
+
+struct BlockNames {
+    /// The register allocator at the start of the block
+    ///
+    /// This allows reconstructing exactly which registers are
+    /// allocated to each node, as long as they are done in the
+    /// same order in `Extractor::extract` and in `SsaBuilder::make_block_ssa`
+    regs: mir::RegAllocator,
+
+    /// The ssa-register assigned to each register written to in the block
+    /// If a register is written to multiple times, the last ssa-register
+    /// will be kept
+    vars: Reg2Reg,
+}
+
+struct Extractor {
+    regs: mir::RegAllocator,
+    // see `SsaBuilder.block_reg_info`
+    block_reg_info: BlockMap<BlockNames>,
+    // used to initialize `SsaBuilder.visited` to a big enough size
+    // to hold all blocks in the original MIR
+    max_block_id: mir::BasicBlockId,
+    // the predecessor of each block
+    predecessors: BlockMap<Vec<mir::BasicBlockId>>,
+}
+
+impl Extractor {
+    /// Extract out...
+    /// * the final ssa-registers that each register maps to
+    /// * the maximum block id
+    /// * the predecessor of this block
+    ///
+    /// This is done in one function, so we can extract all of this information in
+    /// one pass of the MIR.
+    fn extract(&mut self, block_id: mir::BasicBlockId, block: &mir::BasicBlock) {
+        let block_regs = self.regs.clone();
+        let mut block_vars = HashMap::new();
+        for &instr in &block.instrs {
+            match instr {
+                // drop elaboration should run before conversion to ssa
+                mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
+                // no write targets
+                mir::Instr::ConsolePrint(_) => continue,
+                // one write target, create a new register
+                // to ensure that the each register is written to at most once
+                mir::Instr::ConsoleInput(reg)
+                | mir::Instr::Store { dest: reg, val: _ }
+                | mir::Instr::BinOp {
+                    op: _,
+                    dest: reg,
+                    left: _,
+                    right: _,
+                } => {
+                    let new_reg = self.regs.create();
+                    block_vars.insert(reg, new_reg);
+                }
+            }
+        }
+
+        // see SsaBuilder.final_name_assignments for details
+        self.block_reg_info.insert(
+            block_id,
+            BlockNames {
+                regs: block_regs,
+                vars: block_vars,
+            },
+        );
+
+        // track the max_block_id so that the fixedbitset can be initialized to the correct size
+        self.max_block_id = self.max_block_id.max(block_id);
+
+        // track predecessor relationships, to build the dominator frontier
+        match &block.term {
+            mir::Terminator::Jump(next) => self.track_predecessor(next.id, block_id),
+            mir::Terminator::If {
+                cond: _,
+                if_true,
+                if_false,
+            } => {
+                self.track_predecessor(if_true.id, block_id);
+                self.track_predecessor(if_false.id, block_id);
+            }
+            mir::Terminator::ProgramExit => (),
+        }
+    }
+
+    fn track_predecessor(&mut self, child: mir::BasicBlockId, pred: mir::BasicBlockId) {
+        self.predecessors
+            .entry(child)
+            .or_insert_with(Vec::new)
+            .push(pred);
+    }
 }
 
 impl<'a> SsaBuilder<'a> {
@@ -75,11 +168,12 @@ impl<'a> SsaBuilder<'a> {
         // which will be inserted into `final_name_assginments` for that block
         // if there is no conditional mutation, then by definition the variable must be written to
         // in a dominator.
+        // Finally, it is illegal to pass a MIR where any register would be unresolved (i.e. was used before it was defined)
 
         self.dominators
             .strict_dominators(NodeId(block_id))
             .unwrap()
-            .find_map(|NodeId(bb)| self.final_name_assginments[&bb].1.get(&reg).copied())
+            .find_map(|NodeId(bb)| self.block_reg_info[&bb].vars.get(&reg).copied())
             .unwrap()
     }
 
@@ -138,7 +232,7 @@ impl<'a> SsaBuilder<'a> {
         let old_block = &mir.blocks[&block_id];
         let (new_id, mut block) = self.builder.new_block();
 
-        let mut regs = self.final_name_assginments[&block_id].0.clone();
+        let mut regs = self.block_reg_info[&block_id].regs.clone();
 
         for &instr in &old_block.instrs {
             block.instrs.push(match instr {
@@ -235,25 +329,18 @@ pub fn to_ssa_stable(mir: &mir::Mir) -> mir::Mir {
 fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
     assert!(!mir.is_ssa);
 
-    let mut final_name_assignments = HashMap::new();
-    let mut regs = mir::RegAllocator::new();
-
-    let mut predecessors = HashMap::new();
-    predecessors.insert(mir.start, Vec::new());
-    let mut add_pred = |child: mir::BasicBlockId, pred: mir::BasicBlockId| {
-        predecessors
-            .entry(child)
-            .or_insert_with(Vec::new)
-            .push(pred);
-    };
-
-    let mut max_block_id = mir::BasicBlockId::normal_start();
-
     // stablize output
     let blocks = mir
         .blocks
         .iter()
         .map(|(&block_id, block)| (block_id, block));
+
+    let mut extractor = Extractor {
+        regs: mir::RegAllocator::new(),
+        block_reg_info: BlockMap::default(),
+        max_block_id: mir.start,
+        predecessors: BlockMap::default(),
+    };
 
     let blocks = if STABLE_OUTPUT {
         let mut blocks = Vec::from_iter(blocks);
@@ -263,81 +350,36 @@ fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
         either::Right(blocks)
     };
 
-    blocks.for_each(|(block_id, block)| {
-        let block_regs = regs.clone();
-        let mut block_vars = HashMap::new();
-        for &instr in &block.instrs {
-            match instr {
-                // drop elaboration should run before conversion to ssa
-                mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => continue,
-                // no write targets
-                mir::Instr::ConsolePrint(_) => continue,
-                // one write target, create a new register
-                // to ensure that the each register is written to at most once
-                mir::Instr::ConsoleInput(reg)
-                | mir::Instr::Store { dest: reg, val: _ }
-                | mir::Instr::BinOp {
-                    op: _,
-                    dest: reg,
-                    left: _,
-                    right: _,
-                } => {
-                    let new_reg = regs.create();
-                    block_vars.insert(reg, new_reg);
-                }
-            }
-        }
-
-        // see SsaBuilder.final_name_assignments for details
-        final_name_assignments.insert(block_id, (block_regs, block_vars));
-
-        // track the max_block_id so that the fixedbitset can be initialized to the correct size
-        max_block_id = max_block_id.max(block_id);
-
-        // track predecessor relationships, to build the dominator frontier
-        match &block.term {
-            mir::Terminator::Jump(next) => add_pred(next.id, block_id),
-            mir::Terminator::If {
-                cond: _,
-                if_true,
-                if_false,
-            } => {
-                add_pred(if_true.id, block_id);
-                add_pred(if_false.id, block_id);
-            }
-            mir::Terminator::ProgramExit => (),
-        }
-    });
-
-    let predecessors = &predecessors;
+    extractor.predecessors.insert(mir.start, Vec::new());
+    blocks.for_each(|(block_id, block)| extractor.extract(block_id, block));
 
     // Construct a graph represetnting the mir, which it compatible with petgraph's Graph API
     let graph = MirGraph {
         mir,
-        max: max_block_id,
-        predecessors,
+        max: extractor.max_block_id,
+        predecessors: &extractor.predecessors,
     };
 
     let dominators = &petgraph::algo::dominators::simple_fast(graph, NodeId(mir.start));
     // the dominator frontier contains all sucessors which are not dominated the keyed block
     // this tells us where to put block args, since these are exactly the locations where different
     // conditional mutations must be reconciled
-    let dom_frontier = &dominator_frontier(mir, predecessors, dominators);
+    let dom_frontier = &dominator_frontier(mir, &extractor.predecessors, dominators);
     // calculate the block arguments for all blocks, if needed
     // this reconciled conditional mutations to the same register in an SSA friendly way
-    let block_args = &calculate_block_args(mir, dom_frontier, &mut regs);
+    let block_args = &calculate_block_args(mir, dom_frontier, &mut extractor.regs);
 
     // Add block args to the final name assignments so that we can resolve to them
     // This is critical to correctly reconcile loops
     for (block_id, args) in block_args {
-        let (_regs, block_vars) = final_name_assignments.get_mut(block_id).unwrap();
+        let block = extractor.block_reg_info.get_mut(block_id).unwrap();
         for &(arg, new_reg) in args {
-            block_vars.entry(arg).or_insert(new_reg);
+            block.vars.entry(arg).or_insert(new_reg);
         }
     }
 
     let mut ssa_builder = SsaBuilder {
-        final_name_assginments: &final_name_assignments,
+        block_reg_info: &extractor.block_reg_info,
         dominators,
         block_args,
 
