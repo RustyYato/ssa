@@ -1,13 +1,15 @@
 start bb1
 bb1
-    r1 = 100
-    jmp bb2[r1]
-bb2[r5]
-    if r5 bb3 bb4[r5]
+    uninit r1
+    r2 = 100
+    jmp bb2[r2]
+bb2[r7]
+    uninit r3
+    if r7 bb3 bb4[r7]
 bb3
-    print r5
-    r2 = r5 + 1
-    r3 = r2
-    jmp bb4[r3]
-bb4[r4]
-    jmp bb2[r4]
+    print r7
+    r4 = r7 + 1
+    r5 = r4
+    jmp bb4[r5]
+bb4[r6]
+    jmp bb2[r6]

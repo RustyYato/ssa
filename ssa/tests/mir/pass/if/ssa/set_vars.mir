@@ -1,11 +1,12 @@
 start bb1
 bb1
-    input r1
-    r2 = cmp(=, r1, 0)
-    if r2 bb2 bb3[r1]
+    uninit r1
+    input r2
+    r3 = cmp(=, r2, 0)
+    if r3 bb2 bb3[r2]
 bb2
-    r3 = 1
-    jmp bb3[r3]
-bb3[r4]
-    print r4
+    r4 = 1
+    jmp bb3[r4]
+bb3[r5]
+    print r5
     exit
