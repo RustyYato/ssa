@@ -398,7 +398,9 @@ fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
 
     ssa_builder.make_ssa(mir);
 
-    ssa_builder.builder.finish()
+    let mut mir = ssa_builder.builder.finish();
+    mir.is_ssa = true;
+    mir
 }
 
 enum Action<'a> {
