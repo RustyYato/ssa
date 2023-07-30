@@ -13,6 +13,8 @@ bb3
     jmp bb2
 bb6
     print r1
+    start_lt r3
     r3 = r1 + 1
     r1 = r3
+    end_lt r3
     jmp bb3

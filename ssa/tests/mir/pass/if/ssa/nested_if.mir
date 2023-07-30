@@ -10,12 +10,14 @@ bb2
 bb3
     r5 = cmp(=, r2, 1)
     if r5 bb5 bb6
-bb4[r8]
-    print r8
+bb4[r9]
+    print r9
     exit
 bb5
     r6 = 2
-    jmp bb4[r6]
+    jmp bb7[r6]
 bb6
     r7 = 3
-    jmp bb4[r7]
+    jmp bb7[r7]
+bb7[r8]
+    jmp bb4[r8]

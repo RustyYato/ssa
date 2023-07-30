@@ -2,8 +2,10 @@ start bb1
 bb1
     start_lt r1
     uninit r1
+    start_lt r2
     r2 = cmp(=, 0, 1)
     r1 = r2
+    end_lt r2
     if r1 bb3 bb4
 bb2
     end_lt r1
