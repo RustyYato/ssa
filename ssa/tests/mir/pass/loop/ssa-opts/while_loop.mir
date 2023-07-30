@@ -1,0 +1,14 @@
+start bb1
+bb1
+    r1 = 100
+    jmp bb2[r1]
+bb2[r5]
+    r2 = 0
+    if r5 bb3 bb4
+bb3
+    print r5
+    r3 = r5 - 1
+    r4 = r3
+    jmp bb2[r4]
+bb4
+    exit

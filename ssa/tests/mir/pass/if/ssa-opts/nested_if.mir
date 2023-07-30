@@ -1,0 +1,21 @@
+start bb1
+bb1
+    uninit r1
+    input r2
+    r3 = cmp(=, r2, 0)
+    if r3 bb2 bb3
+bb2
+    r4 = 1
+    jmp bb4[r4]
+bb3
+    r5 = cmp(=, r2, 1)
+    if r5 bb5 bb6
+bb4[r9]
+    print r9
+    exit
+bb5
+    r6 = 2
+    jmp bb4[r6]
+bb6
+    r7 = 3
+    jmp bb4[r7]

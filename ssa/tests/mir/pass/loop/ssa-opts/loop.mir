@@ -1,0 +1,6 @@
+start bb1
+bb1
+    jmp bb2
+bb2
+    uninit r1
+    jmp bb2

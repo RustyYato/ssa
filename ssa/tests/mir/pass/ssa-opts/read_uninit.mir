@@ -1,0 +1,5 @@
+start bb1
+bb1
+    uninit r1
+    print r1
+    exit

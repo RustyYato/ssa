@@ -1,0 +1,13 @@
+start bb1
+bb1
+    uninit r1
+    r2 = 100
+    jmp bb2[r2]
+bb2[r7]
+    uninit r3
+    if r7 bb3 bb2[r7]
+bb3
+    print r7
+    r4 = r7 + 1
+    r5 = r4
+    jmp bb2[r5]
