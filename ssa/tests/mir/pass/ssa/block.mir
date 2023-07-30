@@ -1,6 +1,5 @@
 start bb1
 bb1
-    uninit r1
-    r2 = 1
-    print r2
+    r1 = 1
+    print r1
     exit

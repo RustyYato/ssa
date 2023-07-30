@@ -1,4 +1,3 @@
 (block 
-    (let hello)
-    (set hello 1)
+    (let hello 1)
     (print hello))
