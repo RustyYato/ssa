@@ -1,0 +1,6 @@
+start bb1
+bb1
+    start_lt r1
+    print r1
+    end_lt   r1
+    exit
