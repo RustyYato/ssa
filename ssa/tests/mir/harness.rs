@@ -594,6 +594,11 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
                 println!()
             }
             TestResult::Fail { found } => {
+                if let Section::None = section {
+                } else {
+                    section = Section::None;
+                    println!()
+                }
                 println!(
                     "{} test: [{}] {}",
                     "Failed".red(),
@@ -610,6 +615,11 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
                 println!()
             }
             TestResult::Panic(message) => {
+                if let Section::None = section {
+                } else {
+                    section = Section::None;
+                    println!()
+                }
                 println!(
                     "{} test: [{}] {}",
                     "Panicked".magenta(),
@@ -623,6 +633,7 @@ fn write_report(test_groups: LinkedList<Vec<TestOutput>>) {
                 } else {
                     println!("{}", "~~ panic backtrace is missing ~~".bright_magenta());
                 }
+                println!();
             }
         }
     }
