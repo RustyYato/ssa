@@ -308,7 +308,7 @@ impl<'a> SsaBuilder<'a> {
         });
     }
 
-    fn create_block_ref(&self, id: mir::BasicBlockId, nr: &Reg2Reg) -> mir::BasicBlockRef {
+    fn create_block_ref(&self, id: mir::BasicBlockId, nr: &Reg2Reg) -> mir::JumpTarget {
         let args = if let Some(args) = self.block_args.get(&id) {
             let mut new_args = Vec::new();
             for &(arg, _new_reg) in args {
@@ -320,7 +320,7 @@ impl<'a> SsaBuilder<'a> {
         };
         let block_id = self.block_mapping[&id];
 
-        mir::BasicBlockRef { id: block_id, args }
+        mir::JumpTarget { id: block_id, args }
     }
 }
 

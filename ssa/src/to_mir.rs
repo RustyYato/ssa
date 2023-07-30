@@ -288,7 +288,7 @@ impl Encoder {
                 let before_loop = core::mem::replace(ctx.bb, loop_body_block);
                 self.mir.commit(
                     before_loop,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_body)),
+                    mir::Terminator::Jump(mir::JumpTarget::new(loop_body)),
                 );
 
                 let loop_block = self.loop_scope(
@@ -312,12 +312,12 @@ impl Encoder {
 
                 self.mir.commit(
                     loop_block,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_start)),
+                    mir::Terminator::Jump(mir::JumpTarget::new(loop_start)),
                 );
 
                 self.mir.commit(
                     restart_loop_block,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_body)),
+                    mir::Terminator::Jump(mir::JumpTarget::new(loop_body)),
                 );
 
                 Ok(())
@@ -340,7 +340,7 @@ impl Encoder {
 
                 self.mir.commit(
                     before_break,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_end)),
+                    mir::Terminator::Jump(mir::JumpTarget::new(loop_end)),
                 );
 
                 Ok(())
@@ -362,7 +362,7 @@ impl Encoder {
                 }
                 self.mir.commit(
                     before_break,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(loop_start)),
+                    mir::Terminator::Jump(mir::JumpTarget::new(loop_start)),
                 );
 
                 Ok(())
@@ -394,7 +394,7 @@ impl Encoder {
 
                     self.mir.commit(
                         branch_block,
-                        mir::Terminator::Jump(mir::BasicBlockRef::new(exit_id)),
+                        mir::Terminator::Jump(mir::JumpTarget::new(exit_id)),
                     );
                     if_false_id
                 } else {
@@ -405,15 +405,15 @@ impl Encoder {
 
                 self.mir.commit(
                     branch_block,
-                    mir::Terminator::Jump(mir::BasicBlockRef::new(exit_id)),
+                    mir::Terminator::Jump(mir::JumpTarget::new(exit_id)),
                 );
 
                 self.mir.commit(
                     cond_block,
                     mir::Terminator::If {
                         cond,
-                        if_true: mir::BasicBlockRef::new(if_true_id),
-                        if_false: mir::BasicBlockRef::new(if_false_id),
+                        if_true: mir::JumpTarget::new(if_true_id),
+                        if_false: mir::JumpTarget::new(if_false_id),
                     },
                 );
 

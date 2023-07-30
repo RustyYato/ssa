@@ -9,6 +9,7 @@ enum Access {
 }
 
 pub fn clean_up_jumps(mir: &mut mir::Mir) {
+    // this code doesn't correctly handle block args so it can't handle SSA MIR
     assert!(!mir.is_ssa);
 
     jump_threading(mir);
@@ -23,7 +24,7 @@ fn jump_threading(mir: &mut mir::Mir) {
     for bucket in iter {
         let (id, block) = unsafe { bucket.as_mut() };
 
-        let resolve_jump_target = |next: &mut mir::BasicBlockRef| {
+        let resolve_jump_target = |next: &mut mir::JumpTarget| {
             while next.id != *id {
                 let block = &mir.blocks[&next.id];
                 match &block.term {

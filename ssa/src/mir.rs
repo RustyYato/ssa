@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use hashbrown::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mir {
     pub(crate) is_ssa: bool,
     pub(crate) start: BasicBlockId,
@@ -306,12 +306,12 @@ impl core::fmt::Display for BasicBlockId {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct BasicBlockRef {
+pub struct JumpTarget {
     pub id: BasicBlockId,
     pub args: Vec<Val>,
 }
 
-impl Clone for BasicBlockRef {
+impl Clone for JumpTarget {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
@@ -327,7 +327,7 @@ impl Clone for BasicBlockRef {
     }
 }
 
-impl core::fmt::Display for BasicBlockRef {
+impl core::fmt::Display for JumpTarget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.args.is_empty() {
             write!(f, "{}", self.id)
@@ -347,11 +347,11 @@ impl core::fmt::Display for BasicBlockRef {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Terminator {
-    Jump(BasicBlockRef),
+    Jump(JumpTarget),
     If {
         cond: Val,
-        if_true: BasicBlockRef,
-        if_false: BasicBlockRef,
+        if_true: JumpTarget,
+        if_false: JumpTarget,
     },
     ProgramExit,
 }
@@ -370,7 +370,7 @@ impl core::fmt::Display for Terminator {
     }
 }
 
-impl BasicBlockRef {
+impl JumpTarget {
     pub fn new(id: BasicBlockId) -> Self {
         Self {
             id,
