@@ -199,7 +199,7 @@ impl core::fmt::Display for Instr {
         match self {
             Instr::StartLifetime(reg) => write!(f, "start_lt {reg}"),
             Instr::EndLifetime(reg) => write!(f, "end_lt {reg}"),
-            Instr::WriteUninit(reg) => write!(f, "uninit {reg}"),
+            Instr::WriteUninit(reg) => write!(f, "{reg} = uninit"),
             Instr::ConsolePrint(val) => write!(f, "print {val}"),
             Instr::ConsoleInput(reg) => write!(f, "input {reg}"),
             Instr::Store { dest, val } => write!(f, "{dest} = {val}"),

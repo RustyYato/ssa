@@ -1,12 +1,12 @@
 start bb1
 bb1
     start_lt r1
-    uninit r1
+    r1 = uninit
     r1 = 100
     jmp bb2
 bb2
     start_lt r2
-    uninit r2
+    r2 = uninit
     if r1 bb6 bb3
 bb3
     end_lt r2

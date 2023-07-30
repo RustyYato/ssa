@@ -1,6 +1,6 @@
 start bb1
 bb1
     start_lt r1
-    uninit r1
+    r1 = uninit
     end_lt r1
     exit

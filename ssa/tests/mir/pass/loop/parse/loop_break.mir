@@ -3,7 +3,7 @@ bb1
     jmp bb2
 bb2
     start_lt r1
-    uninit r1
+    r1 = uninit
     jmp bb4
 bb3
     end_lt r1
