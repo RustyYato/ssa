@@ -56,6 +56,8 @@ impl NameResolver {
         Self {
             names: istr::IBytesMap::default(),
             scope: Vec::new(),
+            // All names are valid utf-8 (because `istr::IStr` is guranteed to be valid utf-8)
+            // so none of them can ever be equal to b"\xff"
             temp: istr::IBytes::new(b"\xff"),
         }
     }
