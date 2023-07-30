@@ -1,6 +1,6 @@
 use crate::{aliases::*, mir};
 
-pub fn remove_unused(mir: &mut mir::Mir) {
+pub fn remove_unused_writes(mir: &mut mir::Mir) {
     assert!(mir.is_ssa);
 
     let mut regs = RegSet::default();
