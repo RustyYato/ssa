@@ -275,10 +275,6 @@ impl BasicBlockId {
     pub(crate) fn invalid() -> Self {
         BasicBlockId(NonZeroU32::new(u32::MAX).unwrap())
     }
-
-    pub(crate) fn normal_start() -> Self {
-        BasicBlockId(NonZeroU32::new(1).unwrap())
-    }
 }
 
 impl core::fmt::Debug for Reg {
