@@ -206,6 +206,7 @@ impl Encoder {
                     if ident.args.is_empty() {
                         let reg = self.nr.define(ident.name, &mut self.regs);
                         ctx.bb.instrs.push(mir::Instr::StartLifetime(reg));
+                        ctx.bb.instrs.push(mir::Instr::WriteUninit(reg));
                     } else {
                         todo!()
                     }

@@ -169,6 +169,7 @@ pub enum Instr {
     // Basic IO
     ConsolePrint(Val),
     ConsoleInput(Reg),
+    WriteUninit(Reg),
 
     // memory ops
     Store {
@@ -197,7 +198,8 @@ impl core::fmt::Display for Instr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Instr::StartLifetime(reg) => write!(f, "start_lt {reg}"),
-            Instr::EndLifetime(reg) => write!(f, "end_lt   {reg}"),
+            Instr::EndLifetime(reg) => write!(f, "end_lt {reg}"),
+            Instr::WriteUninit(reg) => write!(f, "uninit {reg}"),
             Instr::ConsolePrint(val) => write!(f, "print {val}"),
             Instr::ConsoleInput(reg) => write!(f, "input {reg}"),
             Instr::Store { dest, val } => write!(f, "{dest} = {val}"),
