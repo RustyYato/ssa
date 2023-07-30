@@ -6,5 +6,5 @@ pub fn opt(mir: &mut crate::mir::Mir) {
 
     jump::clean_up_jumps(mir);
     remove_unused::remove_unused(mir);
-    // jump::clean_up_jumps(mir);
+    jump::clean_up_jumps(mir);
 }

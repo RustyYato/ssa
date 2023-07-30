@@ -28,7 +28,7 @@ fn jump_threading(mir: &mut mir::Mir) {
                 let block = &mir.blocks[&next.id];
                 match &block.term {
                     mir::Terminator::Jump(next_next) => {
-                        if block.instrs.is_empty() {
+                        if next_next.id != next.id && block.instrs.is_empty() {
                             let mut next_next = next_next.clone();
                             write_args_to_jump_target(&mut next_next, &block.args, next);
                             *next = next_next;
