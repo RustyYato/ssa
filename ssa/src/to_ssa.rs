@@ -84,7 +84,6 @@ impl Extractor {
                 // one write target, create a new register
                 // to ensure that the each register is written to at most once
                 mir::Instr::ConsoleInput(reg)
-                | mir::Instr::WriteUninit(reg)
                 | mir::Instr::Store { dest: reg, val: _ }
                 | mir::Instr::BinOp {
                     op: _,
@@ -143,7 +142,7 @@ impl<'a> SsaBuilder<'a> {
 
     fn resolve(&self, nr: &Reg2Reg, block_id: mir::BasicBlockId, val: mir::Val) -> mir::Val {
         let reg = match val {
-            mir::Val::ConstI32(_) | mir::Val::ConstBool(_) => return val,
+            mir::Val::ConstI32(_) | mir::Val::ConstBool(_) | mir::Val::Uninit => return val,
             mir::Val::Reg(reg) => reg,
         };
 
@@ -251,11 +250,6 @@ impl<'a> SsaBuilder<'a> {
                     let new_reg = regs.create();
                     nr.insert(reg, new_reg);
                     mir::Instr::ConsoleInput(new_reg)
-                }
-                mir::Instr::WriteUninit(reg) => {
-                    let new_reg = regs.create();
-                    nr.insert(reg, new_reg);
-                    mir::Instr::WriteUninit(new_reg)
                 }
                 mir::Instr::Store { dest, val } => {
                     let new_reg = regs.create();
@@ -432,7 +426,6 @@ fn calculate_block_args<const STABLE_OUTPUT: bool>(
             match instr {
                 mir::Instr::EndLifetime(_) | mir::Instr::ConsolePrint(_) => (),
                 mir::Instr::ConsoleInput(dest)
-                | mir::Instr::WriteUninit(dest)
                 | mir::Instr::Store { dest, val: _ }
                 | mir::Instr::BinOp {
                     op: _,

@@ -169,7 +169,6 @@ pub enum Instr {
     // Basic IO
     ConsolePrint(Val),
     ConsoleInput(Reg),
-    WriteUninit(Reg),
 
     // memory ops
     Store {
@@ -199,7 +198,6 @@ impl core::fmt::Display for Instr {
         match self {
             Instr::StartLifetime(reg) => write!(f, "start_lt {reg}"),
             Instr::EndLifetime(reg) => write!(f, "end_lt {reg}"),
-            Instr::WriteUninit(reg) => write!(f, "{reg} = uninit"),
             Instr::ConsolePrint(val) => write!(f, "print {val}"),
             Instr::ConsoleInput(reg) => write!(f, "input {reg}"),
             Instr::Store { dest, val } => write!(f, "{dest} = {val}"),
@@ -230,6 +228,7 @@ impl core::fmt::Display for Instr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Val {
+    Uninit,
     ConstI32(i32),
     ConstBool(bool),
     Reg(Reg),
@@ -238,6 +237,7 @@ pub enum Val {
 impl core::fmt::Display for Val {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let val: &dyn core::fmt::Display = match self {
+            Val::Uninit => &"uninit",
             Val::ConstI32(val) => val,
             Val::ConstBool(val) => val,
             Val::Reg(val) => val,

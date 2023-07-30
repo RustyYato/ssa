@@ -151,7 +151,7 @@ fn write_args(block: &mut mir::BasicBlock, target: &mir::JumpTarget) {
         match instr {
             mir::Instr::StartLifetime(_) | mir::Instr::EndLifetime(_) => unreachable!(),
             mir::Instr::ConsolePrint(val) => write_args_to_val(val, &block.args, target),
-            mir::Instr::ConsoleInput(_) | mir::Instr::WriteUninit(_) => todo!(),
+            mir::Instr::ConsoleInput(_) => todo!(),
             mir::Instr::Store { dest: _, val } => {
                 write_args_to_val(val, &block.args, target);
             }
@@ -198,7 +198,7 @@ fn write_args_to_val(
     source_target: &mir::JumpTarget,
 ) {
     let reg = match *val {
-        mir::Val::ConstI32(_) | mir::Val::ConstBool(_) => return,
+        mir::Val::ConstI32(_) | mir::Val::ConstBool(_) | mir::Val::Uninit => return,
         mir::Val::Reg(reg) => reg,
     };
 
