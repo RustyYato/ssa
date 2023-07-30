@@ -1,5 +1,4 @@
 start bb1
 bb1
-    r1 = uninit
-    print r1
+    print uninit
     exit

@@ -1,11 +1,9 @@
 start bb1
 bb1
-    r2 = 100
-    jmp bb2[r2]
+    jmp bb2[100]
 bb2[r7]
     if r7 bb3 bb2[r7]
 bb3
     print r7
     r4 = r7 + 1
-    r5 = r4
-    jmp bb2[r5]
+    jmp bb2[r4]

@@ -1,8 +1,6 @@
 start bb1
 bb1
     r1 = 1 + 2
-    r2 = r1
-    r3 = r2 * 2
-    r4 = r3
-    print r4
+    r3 = r1 * 2
+    print r3
     exit

@@ -2,19 +2,10 @@ start bb1
 bb1
     input r2
     r3 = cmp(=, r2, 0)
-    if r3 bb2 bb3
-bb2
-    r4 = 1
-    jmp bb4[r4]
+    if r3 bb4[1] bb3
 bb3
     r5 = cmp(=, r2, 1)
-    if r5 bb5 bb6
+    if r5 bb4[2] bb4[3]
 bb4[r9]
     print r9
     exit
-bb5
-    r6 = 2
-    jmp bb4[r6]
-bb6
-    r7 = 3
-    jmp bb4[r7]
