@@ -3,7 +3,6 @@ bb1
     r1 = 100
     jmp bb2[r1]
 bb2[r5]
-    r2 = 0
     if r5 bb3 bb4
 bb3
     print r5

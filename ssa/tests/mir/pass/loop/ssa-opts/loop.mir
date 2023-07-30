@@ -2,5 +2,4 @@ start bb1
 bb1
     jmp bb2
 bb2
-    r1 = uninit
     jmp bb2

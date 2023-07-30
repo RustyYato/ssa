@@ -1,4 +1,3 @@
 start bb1
 bb1
-    r1 = uninit
     exit

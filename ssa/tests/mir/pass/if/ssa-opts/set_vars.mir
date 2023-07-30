@@ -1,6 +1,5 @@
 start bb1
 bb1
-    r1 = uninit
     input r2
     r3 = cmp(=, r2, 0)
     if r3 bb2 bb3[r2]

@@ -60,10 +60,16 @@ fn main() -> eyre::Result<()> {
     }
     println!("}}");
 
-    let mir = ssa::to_ssa::to_ssa(&mir);
+    let mut mir = ssa::to_ssa::to_ssa(&mir);
 
     let smir = ssa::mir::StableDisplayMir::from(mir.clone());
     println!("{0:=>20} SSA {0:=>20}", "");
+    println!("{smir}");
+
+    ssa::ssa_opts::opt(&mut mir);
+
+    let smir = ssa::mir::StableDisplayMir::from(mir.clone());
+    println!("{0:=>18} SSA OPT {0:=>18}", "");
     println!("{smir}");
 
     Ok(())

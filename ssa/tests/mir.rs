@@ -132,7 +132,7 @@ test_source! {
             Ok(mut mir) => {
                 ssa::mir_opts::clean_up_jumps(&mut mir);
                 let mut mir = ssa::to_ssa::to_ssa_stable(&mir);
-                ssa::ssa_opts::jump::clean_up_jumps(&mut mir);
+                ssa::ssa_opts::opt(&mut mir);
                 let mir = ssa::mir::StableDisplayMir::from(mir);
                 Ok(MaybeIgnore::Ran(format!("{mir}")))
             }

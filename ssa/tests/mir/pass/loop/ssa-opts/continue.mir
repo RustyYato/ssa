@@ -1,10 +1,8 @@
 start bb1
 bb1
-    r1 = uninit
     r2 = 100
     jmp bb2[r2]
 bb2[r7]
-    r3 = uninit
     if r7 bb3 bb2[r7]
 bb3
     print r7
