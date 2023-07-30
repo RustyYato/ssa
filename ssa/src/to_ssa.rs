@@ -373,7 +373,7 @@ fn to_ssa_<const STABLE_OUTPUT: bool>(mir: &mir::Mir) -> mir::Mir {
     let dom_frontier = &dominator_frontier(mir, &extractor.predecessors, dominators);
     // calculate the block arguments for all blocks, if needed
     // this reconciled conditional mutations to the same register in an SSA friendly way
-    let block_args = &calculate_block_args(mir, dom_frontier, &mut extractor.regs);
+    let block_args = &calculate_block_args::<STABLE_OUTPUT>(mir, dom_frontier, &mut extractor.regs);
 
     // Add block args to the final name assignments so that we can resolve to them
     // This is critical to correctly reconcile loops
@@ -411,7 +411,7 @@ enum Action<'a> {
     },
 }
 
-fn calculate_block_args(
+fn calculate_block_args<const STABLE_OUTPUT: bool>(
     mir: &mir::Mir,
     dom_frontier: &BlockMap<Vec<mir::BasicBlockId>>,
     regs: &mut mir::RegAllocator,
@@ -468,6 +468,9 @@ fn calculate_block_args(
             continue;
         };
         stack.extend(initial);
+        if STABLE_OUTPUT {
+            stack.sort_unstable();
+        }
 
         while let Some(block_id) = stack.pop() {
             let dom_frontier = dom_frontier
