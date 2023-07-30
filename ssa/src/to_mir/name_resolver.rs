@@ -5,8 +5,9 @@ use crate::mir::{Reg, RegAllocator};
 use super::EncodingError;
 
 pub(crate) struct NameResolver {
-    names: istr::IStrMap<Vec<Reg>>,
-    scope: Vec<istr::IStr>,
+    names: istr::IBytesMap<Vec<Reg>>,
+    scope: Vec<istr::IBytes>,
+    temp: istr::IBytes,
 }
 
 pub struct ScopeToken(usize);
@@ -53,21 +54,36 @@ impl ConstMaybe for Nothing {
 impl NameResolver {
     pub fn new() -> Self {
         Self {
-            names: istr::IStrMap::default(),
+            names: istr::IBytesMap::default(),
             scope: Vec::new(),
+            temp: istr::IBytes::new(b"\xff"),
         }
     }
 
     pub fn define(&mut self, name: istr::IStr, regs: &mut RegAllocator) -> Reg {
         let reg = regs.create();
+        self.define_to(name, reg);
+        reg
+    }
+
+    pub fn define_to(&mut self, name: istr::IStr, reg: Reg) {
+        self.define_to_(name.to_ibytes(), reg)
+    }
+
+    fn define_to_(&mut self, name: istr::IBytes, reg: Reg) {
         self.names.entry(name).or_default().push(reg);
         self.scope.push(name);
+    }
+
+    pub fn define_temp(&mut self, regs: &mut RegAllocator) -> Reg {
+        let reg = regs.create();
+        self.define_to_(self.temp, reg);
         reg
     }
 
     pub fn resolve(&self, name: istr::IStr) -> Result<Reg, EncodingError> {
         self.names
-            .get(&name)
+            .get(&name.to_ibytes())
             .ok_or(EncodingError::UnresolvedIdent(name))?
             .last()
             .copied()

@@ -214,10 +214,15 @@ impl Encoder {
                 }
                 [ident, val] => {
                     if ident.args.is_empty() {
+                        let scope = self.nr.scope();
                         let val = self.write_expr(val, ctx.by_ref())?;
-                        let reg = self.nr.define(ident.name, &mut self.regs);
+                        let reg = self.regs.create();
                         ctx.bb.instrs.push(mir::Instr::StartLifetime(reg));
                         ctx.bb.instrs.push(mir::Instr::Store { dest: reg, val });
+                        self.close_scope(ctx.by_ref(), scope);
+                        // put the define after the close scope so that it
+                        // doesn't get killed by the scope closure
+                        self.nr.define_to(ident.name, reg);
                     } else {
                         todo!()
                     }
@@ -229,9 +234,11 @@ impl Encoder {
             Some(keywords::Keyword::Set) => match syn.args.as_slice() {
                 [ident, value] => {
                     if ident.args.is_empty() {
+                        let scope = self.nr.scope();
                         let reg = self.nr.resolve(ident.name)?;
                         let val = self.write_expr(value, ctx.by_ref())?;
                         ctx.bb.instrs.push(mir::Instr::Store { dest: reg, val });
+                        self.close_scope(ctx, scope);
                     } else {
                         todo!()
                     }
@@ -428,8 +435,9 @@ impl Encoder {
 
         let left = self.write_expr(left, ctx.by_ref())?;
         let right = self.write_expr(right, ctx.by_ref())?;
-        let temp = self.regs.create();
+        let temp = self.nr.define_temp(&mut self.regs);
 
+        ctx.bb.instrs.push(mir::Instr::StartLifetime(temp));
         ctx.bb.instrs.push(f(temp, left, right));
 
         Ok(mir::Val::Reg(temp))
@@ -456,6 +464,22 @@ impl Encoder {
             Some(keywords::Keyword::Sub) => {
                 self.binary_op(syn, ctx, |dest, left, right| mir::Instr::BinOp {
                     op: mir::BinOp::Sub,
+                    dest,
+                    left,
+                    right,
+                })
+            }
+            Some(keywords::Keyword::Mul) => {
+                self.binary_op(syn, ctx, |dest, left, right| mir::Instr::BinOp {
+                    op: mir::BinOp::Mul,
+                    dest,
+                    left,
+                    right,
+                })
+            }
+            Some(keywords::Keyword::Div) => {
+                self.binary_op(syn, ctx, |dest, left, right| mir::Instr::BinOp {
+                    op: mir::BinOp::Div,
                     dest,
                     left,
                     right,
