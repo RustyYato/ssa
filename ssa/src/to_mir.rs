@@ -214,9 +214,9 @@ impl Encoder {
                 }
                 [ident, val] => {
                     if ident.args.is_empty() {
+                        let val = self.write_expr(val, ctx.by_ref())?;
                         let reg = self.nr.define(ident.name, &mut self.regs);
                         ctx.bb.instrs.push(mir::Instr::StartLifetime(reg));
-                        let val = self.write_expr(val, ctx.by_ref())?;
                         ctx.bb.instrs.push(mir::Instr::Store { dest: reg, val });
                     } else {
                         todo!()
