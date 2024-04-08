@@ -151,6 +151,8 @@ pub trait Visitor<'ast> {
     fn visit_type_primitive(&mut self, ty: &'ast TypePrimitive) {
         ty.default_visit(self)
     }
+
+    fn visit_type_type(&mut self, _universe: u32) {}
 }
 
 pub trait Trivial {}
@@ -671,6 +673,10 @@ pub struct Type<'ast> {
 pub enum TypeKind<'ast> {
     Primitive(TypePrimitive),
     Concrete(&'ast TypeConcrete<'ast>),
+    /// The type of types
+    Type {
+        universe: u32,
+    },
 }
 
 impl<'ast> Visit<'ast> for Type<'ast> {
@@ -683,6 +689,7 @@ impl<'ast> Visit<'ast> for Type<'ast> {
         match kind {
             TypeKind::Primitive(ty) => ty.visit(v),
             TypeKind::Concrete(ty) => ty.visit(v),
+            TypeKind::Type { universe } => v.visit_type_type(*universe),
         }
     }
 }
