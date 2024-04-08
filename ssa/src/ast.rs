@@ -22,6 +22,14 @@ pub trait Visitor<'ast> {
         block.default_visit(self)
     }
 
+    fn visit_item_block(&mut self, block: &'ast ItemBlock<'ast>) {
+        block.default_visit(self);
+    }
+
+    fn visit_conditional_item_block(&mut self, block: &'ast ConditionalItemBlock<'ast>) {
+        block.default_visit(self);
+    }
+
     fn visit_if(&mut self, item_if: &'ast If<'ast>) {
         item_if.default_visit(self)
     }
@@ -38,8 +46,8 @@ pub trait Visitor<'ast> {
         self.visit_let(stmt_let);
     }
 
-    fn visit_item_if(&mut self, _id: ItemId, stmt_if: &'ast If<'ast>) {
-        self.visit_if(stmt_if);
+    fn visit_item_if(&mut self, stmt_if: &'ast ItemIf<'ast>) {
+        stmt_if.default_visit(self);
     }
 
     fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
@@ -211,6 +219,16 @@ macro_rules! make_id {
                 Self(value)
             }
 
+            pub const fn from_u32(value: u32) -> Self {
+                match NonZeroU32::new(value) {
+                    Some(value) => Self::new(value),
+                    None => panic!(concat!(
+                        "You may not use a value of zero for ",
+                        stringify!($name)
+                    )),
+                }
+            }
+
             pub const fn get(self) -> NonZeroU32 {
                 self.0
             }
@@ -260,7 +278,7 @@ pub struct Item<'ast> {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ItemKind<'ast> {
-    If(&'ast If<'ast>),
+    If(&'ast ItemIf<'ast>),
     Let(&'ast Let<'ast>),
 }
 
@@ -272,7 +290,7 @@ impl<'ast> Visit<'ast> for Item<'ast> {
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { id, ref kind } = *self;
         match kind {
-            ItemKind::If(item) => v.visit_item_if(id, item),
+            ItemKind::If(item) => item.visit(v),
             ItemKind::Let(item) => v.visit_item_let(id, item),
         }
     }
@@ -602,6 +620,61 @@ impl<'ast> Visit<'ast> for ConditionalBlock<'ast> {
         let Self { cond, block } = self;
         cond.visit(v);
         block.visit(v)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ItemBlock<'ast> {
+    pub items: &'ast [Item<'ast>],
+}
+
+impl<'ast> Visit<'ast> for ItemBlock<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_item_block(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { items } = self;
+        items.visit(v);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ConditionalItemBlock<'ast> {
+    pub cond: Expr<'ast>,
+    pub block: ItemBlock<'ast>,
+}
+
+impl<'ast> Visit<'ast> for ConditionalItemBlock<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_conditional_item_block(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { cond, block } = self;
+        cond.visit(v);
+        block.visit(v)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ItemIf<'ast> {
+    /// should have at least one block
+    pub blocks: &'ast [ConditionalItemBlock<'ast>],
+    pub default: Option<&'ast ItemBlock<'ast>>,
+}
+
+impl<'ast> Visit<'ast> for ItemIf<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_item_if(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { blocks, default } = self;
+        for b in *blocks {
+            b.visit(v);
+        }
+        default.visit(v);
     }
 }
 
