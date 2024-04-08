@@ -1,63 +1,63 @@
 use core::num::NonZeroU32;
 
 pub trait Visitor<'ast> {
-    fn visit_ident(&mut self, ident: &Ident) {
+    fn visit_ident(&mut self, ident: &'ast Ident) {
         ident.default_visit(self)
     }
 
-    fn visit_block(&mut self, block: &Block<'ast>) {
+    fn visit_block(&mut self, block: &'ast Block<'ast>) {
         block.default_visit(self)
     }
 
-    fn visit_conditional_block(&mut self, block: &ConditionalBlock<'ast>) {
+    fn visit_conditional_block(&mut self, block: &'ast ConditionalBlock<'ast>) {
         block.default_visit(self)
     }
 
-    fn visit_if(&mut self, item_if: &If<'ast>) {
+    fn visit_if(&mut self, item_if: &'ast If<'ast>) {
         item_if.default_visit(self)
     }
 
-    fn visit_loop(&mut self, item_loop: &Loop<'ast>) {
+    fn visit_loop(&mut self, item_loop: &'ast Loop<'ast>) {
         item_loop.default_visit(self)
     }
 
-    fn visit_stmt(&mut self, stmt: &Stmt<'ast>) {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
         stmt.default_visit(self)
     }
 
-    fn visit_stmt_if(&mut self, _id: StmtId, stmt_if: &If<'ast>) {
+    fn visit_stmt_if(&mut self, _id: StmtId, stmt_if: &'ast If<'ast>) {
         stmt_if.default_visit(self)
     }
 
-    fn visit_stmt_loop(&mut self, _id: StmtId, stmt_loop: &Loop<'ast>) {
+    fn visit_stmt_loop(&mut self, _id: StmtId, stmt_loop: &'ast Loop<'ast>) {
         stmt_loop.default_visit(self)
     }
 
-    fn visit_stmt_expr(&mut self, _id: StmtId, stmt_expr: &Expr<'ast>) {
+    fn visit_stmt_expr(&mut self, _id: StmtId, stmt_expr: &'ast Expr<'ast>) {
         stmt_expr.default_visit(self)
     }
 
-    fn visit_expr(&mut self, expr: &Expr<'ast>) {
+    fn visit_expr(&mut self, expr: &'ast Expr<'ast>) {
         expr.default_visit(self)
     }
 
-    fn visit_expr_bin_op(&mut self, expr: &ExprBinOp<'ast>) {
+    fn visit_expr_bin_op(&mut self, expr: &'ast ExprBinOp<'ast>) {
         expr.default_visit(self)
     }
 
-    fn visit_expr_unary_op(&mut self, expr: &ExprUnaryOp<'ast>) {
+    fn visit_expr_unary_op(&mut self, expr: &'ast ExprUnaryOp<'ast>) {
         expr.default_visit(self)
     }
 
-    fn visit_expr_call(&mut self, expr: &ExprCall<'ast>) {
+    fn visit_expr_call(&mut self, expr: &'ast ExprCall<'ast>) {
         expr.default_visit(self)
     }
 
-    fn visit_expr_if(&mut self, _id: ExprId, expr_if: &If<'ast>) {
+    fn visit_expr_if(&mut self, _id: ExprId, expr_if: &'ast If<'ast>) {
         expr_if.default_visit(self)
     }
 
-    fn visit_expr_loop(&mut self, _id: ExprId, expr_loop: &Loop<'ast>) {
+    fn visit_expr_loop(&mut self, _id: ExprId, expr_loop: &'ast Loop<'ast>) {
         expr_loop.default_visit(self)
     }
 }
@@ -68,17 +68,17 @@ impl<T: Copy> Trivial for T {}
 impl<T: Trivial> Trivial for [T] {}
 
 pub trait Visit<'ast>: Trivial {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V);
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V);
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V);
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V);
 }
 
 impl<'ast, T: Visit<'ast>> Visit<'ast> for [T] {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         self.default_visit(v)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         for item in self {
             item.visit(v);
         }
@@ -86,11 +86,11 @@ impl<'ast, T: Visit<'ast>> Visit<'ast> for [T] {
 }
 
 impl<'ast, T: Visit<'ast> + Copy> Visit<'ast> for Option<T> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         self.default_visit(v)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         if let Some(item) = self {
             item.visit(v);
         }
@@ -98,11 +98,11 @@ impl<'ast, T: Visit<'ast> + Copy> Visit<'ast> for Option<T> {
 }
 
 impl<'ast, T: ?Sized + Visit<'ast>> Visit<'ast> for &T {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         T::visit(self, v)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         T::default_visit(self, v)
     }
 }
@@ -133,11 +133,11 @@ pub struct Ident {
 }
 
 impl<'ast> Visit<'ast> for Ident {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_ident(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, _v: &mut V) {}
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, _v: &mut V) {}
 }
 
 make_id!(StmtId);
@@ -155,11 +155,11 @@ pub enum StmtKind<'ast> {
 }
 
 impl<'ast> Visit<'ast> for Stmt<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_stmt(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { id, ref kind } = *self;
         match kind {
             StmtKind::Expr(stmt) => v.visit_stmt_expr(id, stmt),
@@ -187,11 +187,11 @@ pub enum ExprKind<'ast> {
 }
 
 impl<'ast> Visit<'ast> for Expr<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_expr(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { id, ref kind } = *self;
         match kind {
             ExprKind::Ident(ident) => ident.visit(v),
@@ -230,11 +230,11 @@ pub struct ExprBinOp<'ast> {
 }
 
 impl<'ast> Visit<'ast> for ExprBinOp<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_expr_bin_op(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { left, right, op: _ } = self;
         left.visit(v);
         right.visit(v);
@@ -259,11 +259,11 @@ pub struct ExprUnaryOp<'ast> {
 }
 
 impl<'ast> Visit<'ast> for ExprUnaryOp<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_expr_unary_op(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { value, op: _ } = self;
         value.visit(v);
     }
@@ -276,11 +276,11 @@ pub struct ExprCall<'ast> {
 }
 
 impl<'ast> Visit<'ast> for ExprCall<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_expr_call(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { func, args } = self;
         func.visit(v);
         args.visit(v)
@@ -294,11 +294,11 @@ pub struct Block<'ast> {
 }
 
 impl<'ast> Visit<'ast> for Block<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_block(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { stmts, expr } = self;
         stmts.visit(v);
         expr.visit(v)
@@ -312,11 +312,11 @@ pub struct ConditionalBlock<'ast> {
 }
 
 impl<'ast> Visit<'ast> for ConditionalBlock<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_conditional_block(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { cond, block } = self;
         cond.visit(v);
         block.visit(v)
@@ -331,11 +331,11 @@ pub struct If<'ast> {
 }
 
 impl<'ast> Visit<'ast> for If<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_if(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { blocks, default } = self;
         for b in *blocks {
             b.visit(v);
@@ -350,11 +350,11 @@ pub struct Loop<'ast> {
 }
 
 impl<'ast> Visit<'ast> for Loop<'ast> {
-    fn visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         v.visit_loop(self)
     }
 
-    fn default_visit<V: Visitor<'ast> + ?Sized>(&self, v: &mut V) {
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { block } = self;
         block.visit(v);
     }
