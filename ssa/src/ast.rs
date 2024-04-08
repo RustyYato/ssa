@@ -5,6 +5,14 @@ pub trait Visitor<'ast> {
         ident.default_visit(self)
     }
 
+    fn visit_path(&mut self, path: &'ast Path) {
+        path.default_visit(self)
+    }
+
+    fn visit_let(&mut self, item_let: &'ast Let<'ast>) {
+        item_let.default_visit(self)
+    }
+
     fn visit_block(&mut self, block: &'ast Block<'ast>) {
         block.default_visit(self)
     }
@@ -21,16 +29,32 @@ pub trait Visitor<'ast> {
         item_loop.default_visit(self)
     }
 
+    fn visit_item(&mut self, item: &'ast Item<'ast>) {
+        item.default_visit(self)
+    }
+
+    fn visit_item_let(&mut self, _id: ItemId, stmt_let: &'ast Let<'ast>) {
+        self.visit_let(stmt_let);
+    }
+
+    fn visit_item_if(&mut self, _id: ItemId, stmt_if: &'ast If<'ast>) {
+        self.visit_if(stmt_if);
+    }
+
     fn visit_stmt(&mut self, stmt: &'ast Stmt<'ast>) {
         stmt.default_visit(self)
     }
 
+    fn visit_stmt_let(&mut self, _id: StmtId, stmt_let: &'ast Let<'ast>) {
+        self.visit_let(stmt_let);
+    }
+
     fn visit_stmt_if(&mut self, _id: StmtId, stmt_if: &'ast If<'ast>) {
-        stmt_if.default_visit(self)
+        self.visit_if(stmt_if);
     }
 
     fn visit_stmt_loop(&mut self, _id: StmtId, stmt_loop: &'ast Loop<'ast>) {
-        stmt_loop.default_visit(self)
+        self.visit_loop(stmt_loop);
     }
 
     fn visit_stmt_expr(&mut self, _id: StmtId, stmt_expr: &'ast Expr<'ast>) {
@@ -53,12 +77,28 @@ pub trait Visitor<'ast> {
         expr.default_visit(self)
     }
 
+    fn visit_expr_func(&mut self, expr: &'ast ExprFunc<'ast>) {
+        expr.default_visit(self)
+    }
+
+    fn visit_func_param(&mut self, param: &'ast FuncParam<'ast>) {
+        param.default_visit(self)
+    }
+
+    fn visit_expr_ident(&mut self, _id: ExprId, expr_ident: &'ast Ident) {
+        self.visit_ident(expr_ident);
+    }
+
+    fn visit_expr_path(&mut self, _id: ExprId, expr_path: &'ast Path<'ast>) {
+        self.visit_path(expr_path);
+    }
+
     fn visit_expr_if(&mut self, _id: ExprId, expr_if: &'ast If<'ast>) {
-        expr_if.default_visit(self)
+        self.visit_if(expr_if);
     }
 
     fn visit_expr_loop(&mut self, _id: ExprId, expr_loop: &'ast Loop<'ast>) {
-        expr_loop.default_visit(self)
+        self.visit_loop(expr_loop);
     }
 
     fn visit_expr_break(&mut self, _id: ExprId, expr: Option<&'ast Expr<'ast>>) {
@@ -158,6 +198,51 @@ impl<'ast> Visit<'ast> for Ident {
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, _v: &mut V) {}
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Path<'ast> {
+    pub segments: &'ast [Ident],
+}
+
+impl<'ast> Visit<'ast> for Path<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_path(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { segments } = self;
+        for segment in *segments {
+            segment.visit(v);
+        }
+    }
+}
+
+make_id!(ItemId);
+#[derive(Debug, Clone, Copy)]
+pub struct Item<'ast> {
+    pub id: ItemId,
+    pub kind: ItemKind<'ast>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ItemKind<'ast> {
+    If(&'ast If<'ast>),
+    Let(&'ast Let<'ast>),
+}
+
+impl<'ast> Visit<'ast> for Item<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_item(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { id, ref kind } = *self;
+        match kind {
+            ItemKind::If(item) => v.visit_item_if(id, item),
+            ItemKind::Let(item) => v.visit_item_let(id, item),
+        }
+    }
+}
+
 make_id!(StmtId);
 #[derive(Debug, Clone, Copy)]
 pub struct Stmt<'ast> {
@@ -169,6 +254,7 @@ pub struct Stmt<'ast> {
 pub enum StmtKind<'ast> {
     If(&'ast If<'ast>),
     Loop(&'ast Loop<'ast>),
+    Let(&'ast Let<'ast>),
     Expr(&'ast Expr<'ast>),
 }
 
@@ -182,6 +268,7 @@ impl<'ast> Visit<'ast> for Stmt<'ast> {
         match kind {
             StmtKind::Expr(stmt) => v.visit_stmt_expr(id, stmt),
             StmtKind::If(stmt) => v.visit_stmt_if(id, stmt),
+            StmtKind::Let(stmt) => v.visit_stmt_let(id, stmt),
             StmtKind::Loop(stmt) => v.visit_stmt_loop(id, stmt),
         }
     }
@@ -197,9 +284,13 @@ pub struct Expr<'ast> {
 #[derive(Debug, Clone, Copy)]
 pub enum ExprKind<'ast> {
     Ident(&'ast Ident),
+    Path(&'ast Path<'ast>),
     BinOp(&'ast ExprBinOp<'ast>),
     UnaryOp(&'ast ExprUnaryOp<'ast>),
+
     Call(&'ast ExprCall<'ast>),
+    Func(&'ast ExprFunc<'ast>),
+
     If(&'ast If<'ast>),
     Loop(&'ast Loop<'ast>),
 
@@ -216,10 +307,12 @@ impl<'ast> Visit<'ast> for Expr<'ast> {
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { id, ref kind } = *self;
         match kind {
-            ExprKind::Ident(ident) => ident.visit(v),
+            ExprKind::Ident(expr) => v.visit_expr_ident(id, expr),
+            ExprKind::Path(expr) => v.visit_expr_path(id, expr),
             ExprKind::BinOp(expr) => expr.visit(v),
             ExprKind::UnaryOp(expr) => expr.visit(v),
             ExprKind::Call(expr) => expr.visit(v),
+            ExprKind::Func(expr) => expr.visit(v),
             ExprKind::If(expr) => v.visit_expr_if(id, expr),
             ExprKind::Loop(expr) => v.visit_expr_loop(id, expr),
             ExprKind::Break(expr) => v.visit_expr_break(id, *expr),
@@ -313,6 +406,41 @@ impl<'ast> Visit<'ast> for ExprCall<'ast> {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct ExprFunc<'ast> {
+    pub params: &'ast [FuncParam<'ast>],
+    pub body: Block<'ast>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct FuncParam<'ast> {
+    pub name: Ident,
+    pub _lt: core::marker::PhantomData<&'ast ()>,
+}
+
+impl<'ast> Visit<'ast> for FuncParam<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_func_param(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { name, _lt: _ } = self;
+        name.visit(v);
+    }
+}
+
+impl<'ast> Visit<'ast> for ExprFunc<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_expr_func(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { params, body } = self;
+        params.visit(v);
+        body.visit(v)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Block<'ast> {
     pub stmts: &'ast [Stmt<'ast>],
     pub expr: Option<Expr<'ast>>,
@@ -382,5 +510,24 @@ impl<'ast> Visit<'ast> for Loop<'ast> {
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { block } = self;
         block.visit(v);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Let<'ast> {
+    pub binding: Ident,
+    // pub ty: Option<Type<'ast>>,
+    pub value: Option<Expr<'ast>>,
+}
+
+impl<'ast> Visit<'ast> for Let<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_let(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { binding, value } = self;
+        binding.visit(v);
+        value.visit(v);
     }
 }
