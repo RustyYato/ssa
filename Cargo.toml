@@ -3,3 +3,11 @@
 resolver = "2"
 
 members = ["ssa"]
+
+[workspace.dependencies]
+
+istr = "0.1"
+petgraph = "0.6"
+slice-dst = "1"
+erasable = "1.2"
+ref-cast = "1"

@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+istr.workspace = true
+petgraph.workspace = true
+slice-dst.workspace = true
+erasable.workspace = true
+ref-cast.workspace = true
