@@ -87,7 +87,7 @@ fn test() {
             kind: ast::ItemKind::Let(&ast::Let {
                 binding: ast::Ident {
                     id: ast::IdentId::from_u32(1),
-                    name: istr::IBytes::new(b"Option"),
+                    name: istr::IStr::new("Option"),
                 },
                 ty: None,
                 value: Some(ast::Expr {
@@ -96,7 +96,7 @@ fn test() {
                         params: &[ast::TypeParam {
                             name: ast::Ident {
                                 id: ast::IdentId::from_u32(2),
-                                name: istr::IBytes::new(b"T"),
+                                name: istr::IStr::new("T"),
                             },
                             bounds: [],
                         }],
@@ -104,7 +104,7 @@ fn test() {
                             ast::Field {
                                 name: ast::Ident {
                                     id: ast::IdentId::from_u32(2),
-                                    name: istr::IBytes::new(b"Some"),
+                                    name: istr::IStr::new("Some"),
                                 },
                                 ty: ast::Type {
                                     id: ast::TypeId::from_u32(1),
@@ -112,7 +112,7 @@ fn test() {
                                         name: ast::Path {
                                             segments: &[ast::Ident {
                                                 id: ast::IdentId::from_u32(3),
-                                                name: istr::IBytes::new(b"T"),
+                                                name: istr::IStr::new("T"),
                                             }],
                                         },
                                         generics: &[],
@@ -122,7 +122,7 @@ fn test() {
                             ast::Field {
                                 name: ast::Ident {
                                     id: ast::IdentId::from_u32(4),
-                                    name: istr::IBytes::new(b"None"),
+                                    name: istr::IStr::new("None"),
                                 },
                                 ty: ast::Type {
                                     id: ast::TypeId::from_u32(2),

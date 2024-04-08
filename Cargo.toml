@@ -11,3 +11,12 @@ petgraph = "0.6"
 slice-dst = "1"
 erasable = "1.2"
 ref-cast = "1"
+bumpalo = "3"
+
+[workspace.dependencies.smallvec]
+version = "1"
+features = ["union", "const_generics"]
+
+[workspace.dependencies.logos]
+git = "https://github.com/RustyYato/logos.git"
+branch = "remove-unreachable-error"

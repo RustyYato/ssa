@@ -208,8 +208,17 @@ impl<'ast, T: ?Sized + Visit<'ast>> Visit<'ast> for &T {
     }
 }
 
+#[derive(Default)]
+pub struct IdCtx {
+    items: u32,
+    exprs: u32,
+    idents: u32,
+    stmts: u32,
+    types: u32,
+}
+
 macro_rules! make_id {
-    ($name:ident) => {
+    ($name:ident $field:ident $func:ident) => {
         #[repr(transparent)]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $name(NonZeroU32);
@@ -233,14 +242,21 @@ macro_rules! make_id {
                 self.0
             }
         }
+
+        impl IdCtx {
+            pub fn $func(&mut self) -> $name {
+                self.$field += 1;
+                $name::from_u32(self.$field)
+            }
+        }
     };
 }
 
-make_id!(IdentId);
+make_id!(IdentId idents ident_id);
 #[derive(Debug, Clone, Copy)]
 pub struct Ident {
     pub id: IdentId,
-    pub name: istr::IBytes,
+    pub name: istr::IStr,
 }
 
 impl<'ast> Visit<'ast> for Ident {
@@ -269,7 +285,7 @@ impl<'ast> Visit<'ast> for Path<'ast> {
     }
 }
 
-make_id!(ItemId);
+make_id!(ItemId items item_id);
 #[derive(Debug, Clone, Copy)]
 pub struct Item<'ast> {
     pub id: ItemId,
@@ -296,7 +312,7 @@ impl<'ast> Visit<'ast> for Item<'ast> {
     }
 }
 
-make_id!(StmtId);
+make_id!(StmtId stmts stmt_id);
 #[derive(Debug, Clone, Copy)]
 pub struct Stmt<'ast> {
     pub id: StmtId,
@@ -327,7 +343,7 @@ impl<'ast> Visit<'ast> for Stmt<'ast> {
     }
 }
 
-make_id!(ExprId);
+make_id!(ExprId exprs expr_id);
 #[derive(Debug, Clone, Copy)]
 pub struct Expr<'ast> {
     pub id: ExprId,
@@ -423,6 +439,8 @@ impl<'ast> Visit<'ast> for ExprBinOp<'ast> {
 pub enum UnaryOp {
     // bool => int
     IntFromBool,
+    // pointer => addr (int)
+    IntFromPtr,
     // bool => bool
     // int => int
     Not,
@@ -432,7 +450,7 @@ pub enum UnaryOp {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ExprUnaryOp<'ast> {
-    pub op: BinOp,
+    pub op: UnaryOp,
     pub value: Expr<'ast>,
 }
 
@@ -735,7 +753,7 @@ impl<'ast> Visit<'ast> for Let<'ast> {
     }
 }
 
-make_id!(TypeId);
+make_id!(TypeId types type_id);
 #[derive(Debug, Clone, Copy)]
 pub struct Type<'ast> {
     pub id: TypeId,
