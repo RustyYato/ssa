@@ -60,6 +60,24 @@ pub trait Visitor<'ast> {
     fn visit_expr_loop(&mut self, _id: ExprId, expr_loop: &'ast Loop<'ast>) {
         expr_loop.default_visit(self)
     }
+
+    fn visit_expr_break(&mut self, _id: ExprId, expr: Option<&'ast Expr<'ast>>) {
+        if let Some(expr) = expr {
+            expr.default_visit(self)
+        }
+    }
+
+    fn visit_expr_continue(&mut self, _id: ExprId, expr: Option<&'ast Expr<'ast>>) {
+        if let Some(expr) = expr {
+            expr.default_visit(self)
+        }
+    }
+
+    fn visit_expr_return(&mut self, _id: ExprId, expr: Option<&'ast Expr<'ast>>) {
+        if let Some(expr) = expr {
+            expr.default_visit(self)
+        }
+    }
 }
 
 pub trait Trivial {}
@@ -184,6 +202,10 @@ pub enum ExprKind<'ast> {
     Call(&'ast ExprCall<'ast>),
     If(&'ast If<'ast>),
     Loop(&'ast Loop<'ast>),
+
+    Break(Option<&'ast Expr<'ast>>),
+    Continue(Option<&'ast Expr<'ast>>),
+    Return(Option<&'ast Expr<'ast>>),
 }
 
 impl<'ast> Visit<'ast> for Expr<'ast> {
@@ -200,6 +222,9 @@ impl<'ast> Visit<'ast> for Expr<'ast> {
             ExprKind::Call(expr) => expr.visit(v),
             ExprKind::If(expr) => v.visit_expr_if(id, expr),
             ExprKind::Loop(expr) => v.visit_expr_loop(id, expr),
+            ExprKind::Break(expr) => v.visit_expr_break(id, *expr),
+            ExprKind::Continue(expr) => v.visit_expr_continue(id, *expr),
+            ExprKind::Return(expr) => v.visit_expr_return(id, *expr),
         }
     }
 }
