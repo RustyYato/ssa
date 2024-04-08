@@ -1,4 +1,5 @@
 use core::num::NonZeroU32;
+use std::num::NonZeroU16;
 
 pub trait Visitor<'ast> {
     fn visit_ident(&mut self, ident: &'ast Ident) {
@@ -117,6 +118,38 @@ pub trait Visitor<'ast> {
         if let Some(expr) = expr {
             expr.default_visit(self)
         }
+    }
+
+    fn visit_expr_struct(&mut self, expr_struct: &'ast ExprStruct<'ast>) {
+        expr_struct.default_visit(self);
+    }
+
+    fn visit_expr_union(&mut self, expr_union: &'ast ExprUnion<'ast>) {
+        expr_union.default_visit(self);
+    }
+
+    fn visit_expr_enum(&mut self, expr_enum: &'ast ExprEnum<'ast>) {
+        expr_enum.default_visit(self);
+    }
+
+    fn visit_type_param(&mut self, param: &'ast TypeParam<'ast>) {
+        param.default_visit(self);
+    }
+
+    fn visit_field(&mut self, field: &'ast Field<'ast>) {
+        field.default_visit(self);
+    }
+
+    fn visit_type(&mut self, ty: &'ast Type<'ast>) {
+        ty.default_visit(self)
+    }
+
+    fn visit_type_concrete(&mut self, ty: &'ast TypeConcrete<'ast>) {
+        ty.default_visit(self)
+    }
+
+    fn visit_type_primitive(&mut self, ty: &'ast TypePrimitive) {
+        ty.default_visit(self)
     }
 }
 
@@ -297,6 +330,10 @@ pub enum ExprKind<'ast> {
     Break(Option<&'ast Expr<'ast>>),
     Continue(Option<&'ast Expr<'ast>>),
     Return(Option<&'ast Expr<'ast>>),
+
+    Struct(&'ast ExprStruct<'ast>),
+    Union(&'ast ExprUnion<'ast>),
+    Enum(&'ast ExprEnum<'ast>),
 }
 
 impl<'ast> Visit<'ast> for Expr<'ast> {
@@ -318,6 +355,9 @@ impl<'ast> Visit<'ast> for Expr<'ast> {
             ExprKind::Break(expr) => v.visit_expr_break(id, *expr),
             ExprKind::Continue(expr) => v.visit_expr_continue(id, *expr),
             ExprKind::Return(expr) => v.visit_expr_return(id, *expr),
+            ExprKind::Struct(expr) => expr.visit(v),
+            ExprKind::Union(expr) => expr.visit(v),
+            ExprKind::Enum(expr) => expr.visit(v),
         }
     }
 }
@@ -441,6 +481,93 @@ impl<'ast> Visit<'ast> for ExprFunc<'ast> {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct ExprStruct<'ast> {
+    pub params: &'ast [TypeParam<'ast>],
+    pub fields: &'ast [Field<'ast>],
+}
+
+impl<'ast> Visit<'ast> for ExprStruct<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_expr_struct(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { params, fields } = self;
+        params.visit(v);
+        fields.visit(v)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExprUnion<'ast> {
+    pub params: &'ast [TypeParam<'ast>],
+    pub variants: &'ast [Field<'ast>],
+}
+
+impl<'ast> Visit<'ast> for ExprUnion<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_expr_union(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { params, variants } = self;
+        params.visit(v);
+        variants.visit(v)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ExprEnum<'ast> {
+    pub variants: &'ast [Ident],
+}
+
+impl<'ast> Visit<'ast> for ExprEnum<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_expr_enum(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { variants } = self;
+        variants.visit(v)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TypeParam<'ast> {
+    pub name: Ident,
+    pub bounds: [&'ast (); 0],
+}
+
+impl<'ast> Visit<'ast> for TypeParam<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_type_param(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { name, bounds: _ } = self;
+        name.visit(v);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Field<'ast> {
+    pub name: Ident,
+    pub ty: Type<'ast>,
+}
+
+impl<'ast> Visit<'ast> for Field<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_field(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { name, ty } = self;
+        name.visit(v);
+        ty.visit(v);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Block<'ast> {
     pub stmts: &'ast [Stmt<'ast>],
     pub expr: Option<Expr<'ast>>,
@@ -516,7 +643,7 @@ impl<'ast> Visit<'ast> for Loop<'ast> {
 #[derive(Debug, Clone, Copy)]
 pub struct Let<'ast> {
     pub binding: Ident,
-    // pub ty: Option<Type<'ast>>,
+    pub ty: Option<Type<'ast>>,
     pub value: Option<Expr<'ast>>,
 }
 
@@ -526,8 +653,84 @@ impl<'ast> Visit<'ast> for Let<'ast> {
     }
 
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
-        let Self { binding, value } = self;
+        let Self { binding, ty, value } = self;
         binding.visit(v);
+        ty.visit(v);
         value.visit(v);
     }
+}
+
+make_id!(TypeId);
+#[derive(Debug, Clone, Copy)]
+pub struct Type<'ast> {
+    pub id: TypeId,
+    pub kind: TypeKind<'ast>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TypeKind<'ast> {
+    Primitive(TypePrimitive),
+    Concrete(&'ast TypeConcrete<'ast>),
+}
+
+impl<'ast> Visit<'ast> for Type<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_type(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { id: _, ref kind } = *self;
+        match kind {
+            TypeKind::Primitive(ty) => ty.visit(v),
+            TypeKind::Concrete(ty) => ty.visit(v),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TypeConcrete<'ast> {
+    pub name: Path<'ast>,
+    pub generics: &'ast [Type<'ast>],
+}
+
+impl<'ast> Visit<'ast> for TypeConcrete<'ast> {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_type_concrete(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        let Self { name, generics } = self;
+        name.visit(v);
+        generics.visit(v);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TypePrimitive {
+    /// A type with one trivial constructor
+    Unit,
+    /// A type with no constructors
+    Void,
+    /// signed integers with the given number of bits
+    SInt { bits: NonZeroU16 },
+    /// unsigned integers with the given number of bits
+    UInt { bits: NonZeroU16 },
+    /// ieee-754 32-bit float
+    Float32,
+    /// ieee-754 64-bit float
+    Float64,
+    /// the address integer type, unsigned and has a target-specific number of bits
+    ///
+    /// has provenance, unlike normal integers
+    Addr,
+    /// an 8-bit scalar type which can be uninitialized
+    Byte,
+}
+
+impl<'ast> Visit<'ast> for TypePrimitive {
+    fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
+        v.visit_type_primitive(self)
+    }
+
+    fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, _v: &mut V) {}
 }
