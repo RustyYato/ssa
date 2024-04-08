@@ -138,6 +138,7 @@ enum LexerError {}
 impl Default for LexerError {
     fn default() -> Self {
         extern "C" {
+            #[link_name = "lexer.error.unreachable.default.this should intentionally not link to anything"]
             fn __lexer_error_unreachable_default() -> !;
         }
 
