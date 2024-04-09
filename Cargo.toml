@@ -12,6 +12,8 @@ slice-dst = "1"
 erasable = "1.2"
 ref-cast = "1"
 bumpalo = "3"
+yoke = { version = "0.7", features = ["derive"] }
+stable_deref_trait = { version = "1" }
 
 [workspace.dependencies.smallvec]
 version = "1"

@@ -10,5 +10,7 @@ slice-dst.workspace = true
 erasable.workspace = true
 ref-cast.workspace = true
 bumpalo.workspace = true
+yoke.workspace = true
+stable_deref_trait.workspace = true
 smallvec.workspace = true
 logos.workspace = true
