@@ -505,7 +505,7 @@ impl<'ast, 'text> Parser<'ast, 'text> {
     }
 
     fn parse_expr_in(&mut self, prec: ExprPrec) -> ast::Expr<'ast> {
-        let mut expr = self.parse_expr_terminal();
+        let mut expr = self.parse_expr_terminal(prec);
 
         while let Some((op, left, right)) = self.peek_expr_postfix() {
             if prec >= left {
@@ -518,7 +518,21 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         expr
     }
 
-    fn parse_expr_terminal(&mut self) -> ast::Expr<'ast> {
+    fn is_expr_start(&self) -> bool {
+        matches!(
+            self.peek(),
+            TokenKind::Ident(_)
+                | TokenKind::Addr
+                | TokenKind::OpenCurly
+                | TokenKind::If
+                | TokenKind::Loop
+                | TokenKind::Break
+                | TokenKind::Continue
+                | TokenKind::Return
+        )
+    }
+
+    fn parse_expr_terminal(&mut self, prec: ExprPrec) -> ast::Expr<'ast> {
         let kind = match self.peek() {
             TokenKind::Ident(_) | TokenKind::Addr => {
                 ast::ExprKind::Ident(self.ctx.alloc(self.parse_ident()))
@@ -526,6 +540,30 @@ impl<'ast, 'text> Parser<'ast, 'text> {
             TokenKind::OpenCurly => ast::ExprKind::Block(self.ctx.alloc(self.parse_block())),
             TokenKind::If => ast::ExprKind::If(self.parse_if()),
             TokenKind::Loop => ast::ExprKind::Loop(self.parse_loop()),
+            TokenKind::Break => {
+                self.debug_expect(TokenKind::Break);
+                ast::ExprKind::Break(if self.is_expr_start() {
+                    Some(self.ctx.alloc(self.parse_expr_in(prec)))
+                } else {
+                    None
+                })
+            }
+            TokenKind::Continue => {
+                self.debug_expect(TokenKind::Continue);
+                ast::ExprKind::Continue(if self.is_expr_start() {
+                    Some(self.ctx.alloc(self.parse_expr_in(prec)))
+                } else {
+                    None
+                })
+            }
+            TokenKind::Return => {
+                self.debug_expect(TokenKind::Return);
+                ast::ExprKind::Return(if self.is_expr_start() {
+                    Some(self.ctx.alloc(self.parse_expr_in(prec)))
+                } else {
+                    None
+                })
+            }
             _ => unreachable!(),
         };
 
