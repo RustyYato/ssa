@@ -102,6 +102,10 @@ pub trait Visitor<'ast> {
         self.visit_path(expr_path);
     }
 
+    fn visit_expr_block(&mut self, _id: ExprId, expr_block: &'ast Block<'ast>) {
+        self.visit_block(expr_block)
+    }
+
     fn visit_expr_if(&mut self, _id: ExprId, expr_if: &'ast If<'ast>) {
         self.visit_if(expr_if);
     }
@@ -349,6 +353,20 @@ impl<'ast> Visit<'ast> for Stmt<'ast> {
     }
 }
 
+impl StmtKind<'_> {
+    pub fn has_block(&self) -> bool {
+        matches!(
+            self,
+            StmtKind::If(_)
+                | StmtKind::Loop(_)
+                | StmtKind::Expr(Expr {
+                    kind: ExprKind::Block(_),
+                    ..
+                })
+        )
+    }
+}
+
 make_id!(ExprId exprs expr_id);
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Expr<'ast> {
@@ -366,6 +384,7 @@ pub enum ExprKind<'ast> {
     Call(&'ast ExprCall<'ast>),
     Func(&'ast ExprFunc<'ast>),
 
+    Block(&'ast Block<'ast>),
     If(&'ast If<'ast>),
     Loop(&'ast Loop<'ast>),
 
@@ -392,6 +411,7 @@ impl<'ast> Visit<'ast> for Expr<'ast> {
             ExprKind::UnaryOp(expr) => expr.visit(v),
             ExprKind::Call(expr) => expr.visit(v),
             ExprKind::Func(expr) => expr.visit(v),
+            ExprKind::Block(expr) => v.visit_expr_block(id, expr),
             ExprKind::If(expr) => v.visit_expr_if(id, expr),
             ExprKind::Loop(expr) => v.visit_expr_loop(id, expr),
             ExprKind::Break(expr) => v.visit_expr_break(id, *expr),
@@ -614,7 +634,7 @@ impl<'ast> Visit<'ast> for Field<'ast> {
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Block<'ast> {
     pub stmts: &'ast [Stmt<'ast>],
-    pub expr: Option<Expr<'ast>>,
+    pub expr: Option<&'ast Expr<'ast>>,
 }
 
 impl<'ast> Visit<'ast> for Block<'ast> {

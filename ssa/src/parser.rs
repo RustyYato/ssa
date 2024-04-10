@@ -184,7 +184,9 @@ pub struct AstContext {
 #[derive(Default)]
 pub struct ObjectPools<'ast> {
     cond_item_blocks: Pool<ast::ConditionalItemBlock<'ast>, 4>,
+    cond_blocks: Pool<ast::ConditionalBlock<'ast>, 4>,
     expr: Pool<ast::Expr<'ast>, 4>,
+    stmt: Pool<ast::Stmt<'ast>, 16>,
     item: Pool<ast::Item<'ast>, 16>,
 }
 
@@ -221,7 +223,9 @@ impl ObjectPools<'_> {
     pub fn clear<'a>(self) -> ObjectPools<'a> {
         ObjectPools {
             cond_item_blocks: self.cond_item_blocks.reuse(),
+            cond_blocks: self.cond_blocks.reuse(),
             expr: self.expr.reuse(),
+            stmt: self.stmt.reuse(),
             item: self.item.reuse(),
         }
     }
@@ -307,11 +311,7 @@ impl<'ast, 'text> Parser<'ast, 'text> {
     }
 
     pub fn into_pool(self) -> ObjectPools<'static> {
-        ObjectPools {
-            cond_item_blocks: self.pool.cond_item_blocks.reuse(),
-            expr: self.pool.expr.reuse(),
-            item: self.pool.item.reuse(),
-        }
+        self.pool.clear()
     }
 
     pub fn clear_text<'a>(self) -> Parser<'ast, 'a> {
@@ -388,6 +388,19 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         }
     }
 
+    fn parse_stmt(&mut self) -> ast::Stmt<'ast> {
+        let kind = match self.peek() {
+            TokenKind::If => ast::StmtKind::If(self.parse_if()),
+            TokenKind::Let => ast::StmtKind::Let(self.parse_let()),
+            _ => ast::StmtKind::Expr(self.ctx.alloc(self.parse_expr())),
+        };
+
+        ast::Stmt {
+            id: self.id_ctx.stmt_id(),
+            kind,
+        }
+    }
+
     fn parse_ident(&mut self) -> ast::Ident {
         match self.peek() {
             TokenKind::Ident(value) => {
@@ -435,6 +448,36 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         })
     }
 
+    fn parse_if(&mut self) -> &'ast ast::If<'ast> {
+        self.debug_expect(TokenKind::If);
+        let cond = self.parse_expr();
+        let block = self.parse_block();
+        let mut blocks = self.pool.cond_blocks.alloc();
+        blocks.push(ast::ConditionalBlock { cond, block });
+        let mut default = None;
+
+        while self.parse(TokenKind::Else) {
+            if self.parse(TokenKind::If) {
+                let cond = self.parse_expr();
+                let block = self.parse_block();
+
+                blocks.push(ast::ConditionalBlock { cond, block });
+            } else {
+                default = Some(self.ctx.alloc(self.parse_block()));
+                break;
+            }
+        }
+
+        let cond_blocks = self.ctx.alloc_slice(&blocks);
+
+        self.pool.cond_blocks.free(blocks);
+
+        self.ctx.alloc(ast::If {
+            blocks: cond_blocks,
+            default,
+        })
+    }
+
     fn parse_let(&mut self) -> &'ast ast::Let<'ast> {
         self.debug_expect(TokenKind::Let);
         let name = self.parse_ident();
@@ -470,7 +513,11 @@ impl<'ast, 'text> Parser<'ast, 'text> {
 
     fn parse_expr_terminal(&mut self) -> ast::Expr<'ast> {
         let kind = match self.peek() {
-            TokenKind::Ident(_) => ast::ExprKind::Ident(self.ctx.alloc(self.parse_ident())),
+            TokenKind::Ident(_) | TokenKind::Addr => {
+                ast::ExprKind::Ident(self.ctx.alloc(self.parse_ident()))
+            }
+            TokenKind::OpenCurly => ast::ExprKind::Block(self.ctx.alloc(self.parse_block())),
+            TokenKind::If => ast::ExprKind::If(self.parse_if()),
             _ => unreachable!(),
         };
 
@@ -582,7 +629,47 @@ impl<'ast, 'text> Parser<'ast, 'text> {
     }
 
     fn parse_block(&mut self) -> ast::Block<'ast> {
-        todo!()
+        let mut pool_stmts = self.pool.stmt.alloc();
+        self.expect(TokenKind::OpenCurly);
+        let mut last = None::<ast::Stmt>;
+        loop {
+            if let Some(stmt) = last {
+                if !stmt.kind.has_block() && !self.parse(TokenKind::Semicolon) {
+                    break;
+                }
+                pool_stmts.push(stmt);
+                last = None;
+            }
+
+            let stmt = match self.peek() {
+                TokenKind::CloseCurly | TokenKind::Eof => break,
+                TokenKind::Semicolon => {
+                    self.lexer.next_token();
+                    continue;
+                }
+                _ => self.parse_stmt(),
+            };
+            last = Some(stmt);
+        }
+        self.expect(TokenKind::CloseCurly);
+        let mut expr = None;
+        if let Some(ast::Stmt {
+            kind: ast::StmtKind::Expr(e),
+            ..
+        }) = last
+        {
+            expr = Some(e);
+        } else if let Some(last) = last {
+            pool_stmts.push(last);
+
+            if !last.kind.has_block() {
+                self.expect(TokenKind::Semicolon);
+            }
+        }
+
+        let stmts = self.ctx.alloc_slice(&pool_stmts);
+        self.pool.stmt.free(pool_stmts);
+        ast::Block { stmts, expr }
     }
 }
 

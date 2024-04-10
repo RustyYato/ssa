@@ -1,0 +1,61 @@
+[
+    id: 1
+    kind:
+        Let:
+            binding:
+                id: 1
+                name: "with_expr"
+            ty: null
+            value:
+                id: 3
+                kind:
+                    Block:
+                        stmts: [
+                            id: 1
+                            kind:
+                                Let:
+                                    binding:
+                                        id: 2
+                                        name: "y"
+                                    ty: null
+                                    value:
+                                        id: 1
+                                        kind:
+                                            Ident:
+                                                id: 3
+                                                name: "x"
+                        ]
+                        expr:
+                            id: 2
+                            kind:
+                                Ident:
+                                    id: 4
+                                    name: "x",
+    id: 2
+    kind:
+        Let:
+            binding:
+                id: 5
+                name: "no_expr"
+            ty: null
+            value:
+                id: 5
+                kind:
+                    Block:
+                        stmts: [
+                            id: 3
+                            kind:
+                                Let:
+                                    binding:
+                                        id: 6
+                                        name: "y"
+                                    ty: null
+                                    value:
+                                        id: 4
+                                        kind:
+                                            Ident:
+                                                id: 7
+                                                name: "x"
+                        ]
+                        expr: null
+]

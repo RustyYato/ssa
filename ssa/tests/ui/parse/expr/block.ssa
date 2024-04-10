@@ -1,0 +1,7 @@
+let with_expr = {
+    let y = x;
+    x
+};
+let no_expr = {
+    let y = x;
+};

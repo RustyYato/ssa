@@ -5,7 +5,7 @@ fn main() -> ! {
 }
 
 test_harness::test_corpus! {
-    test_harness::TestDirectory::new("ui/parse", concat!(env!("CARGO_MANIFEST_DIR"), "/tests/ui/parse"), UiTestCorpus)
+    test_harness::TestDirectory::new("ui/parse", "tests/ui/parse", UiTestCorpus)
 }
 
 struct UiTestCorpus;
