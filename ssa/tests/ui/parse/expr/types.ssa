@@ -1,1 +1,1 @@
-let x: (addr, u32, i32, f32, f64, i43, u52, Option[T]) = x;
+let x: (addr, u32, i32, f32, f64, i43, u52, std::option::Option[T]) = x;

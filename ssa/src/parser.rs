@@ -191,6 +191,7 @@ pub struct ObjectPools<'ast> {
     stmt: Pool<ast::Stmt<'ast>, 16>,
     types: Pool<ast::Type<'ast>, 4>,
     item: Pool<ast::Item<'ast>, 16>,
+    ident: Pool<ast::Ident, 4>,
 }
 
 #[derive(Clone, Copy)]
@@ -230,6 +231,7 @@ impl ObjectPools<'_> {
             expr: self.expr.reuse(),
             stmt: self.stmt.reuse(),
             types: self.types.reuse(),
+            ident: self.ident.reuse(),
             item: self.item.reuse(),
         }
     }
@@ -421,6 +423,20 @@ impl<'ast, 'text> Parser<'ast, 'text> {
             },
             _ => unreachable!(),
         }
+    }
+
+    fn parse_path(&mut self, first: Option<ast::Ident>) -> ast::Path<'ast> {
+        let mut pool_idents = self.pool.ident.alloc();
+        pool_idents.push(first.unwrap_or_else(|| self.parse_ident()));
+
+        while self.parse(TokenKind::Colon2) {
+            pool_idents.push(self.parse_ident())
+        }
+
+        let segments = self.ctx.alloc_slice(&pool_idents);
+        self.pool.ident.free(pool_idents);
+
+        ast::Path { segments }
     }
 
     fn parse_item_if(&mut self) -> &'ast ast::ItemIf<'ast> {
@@ -804,19 +820,13 @@ impl<'ast, 'text> Parser<'ast, 'text> {
     }
 
     fn parse_type_concrete(&mut self) -> &'ast ast::TypeConcrete<'ast> {
-        // TODO: name should be a path
-        let name = self.parse_ident();
+        let name = self.parse_path(None);
         let generics = if self.parse(TokenKind::OpenSquare) {
             self.parse_type_list(TokenKind::CloseSquare)
         } else {
             &[]
         };
-        self.ctx.alloc(ast::TypeConcrete {
-            name: ast::Path {
-                segments: self.ctx.alloc_slice(&[name]),
-            },
-            generics,
-        })
+        self.ctx.alloc(ast::TypeConcrete { name, generics })
     }
 }
 
