@@ -164,7 +164,11 @@ pub trait Visitor<'ast> {
         ty.default_visit(self)
     }
 
-    fn visit_type_type(&mut self, _universe: u32) {}
+    fn visit_type_tuple(&mut self, _id: TypeId, tys: &'ast [Type<'ast>]) {
+        tys.default_visit(self)
+    }
+
+    fn visit_type_type(&mut self, _id: TypeId, _universe: u32) {}
 }
 
 pub trait Trivial {}
@@ -789,6 +793,7 @@ pub struct Type<'ast> {
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum TypeKind<'ast> {
     Primitive(TypePrimitive),
+    Tuple(&'ast [Type<'ast>]),
     Concrete(&'ast TypeConcrete<'ast>),
     /// The type of types
     Type {
@@ -802,11 +807,12 @@ impl<'ast> Visit<'ast> for Type<'ast> {
     }
 
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
-        let Self { id: _, ref kind } = *self;
+        let Self { id, ref kind } = *self;
         match kind {
             TypeKind::Primitive(ty) => ty.visit(v),
+            TypeKind::Tuple(ty) => v.visit_type_tuple(id, ty),
             TypeKind::Concrete(ty) => ty.visit(v),
-            TypeKind::Type { universe } => v.visit_type_type(*universe),
+            TypeKind::Type { universe } => v.visit_type_type(id, *universe),
         }
     }
 }

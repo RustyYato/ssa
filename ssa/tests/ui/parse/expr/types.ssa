@@ -1,0 +1,1 @@
+let x: (addr, u32, i32, f32, f64, i43, u52, Option[T]) = x;

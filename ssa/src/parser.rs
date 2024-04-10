@@ -1,3 +1,5 @@
+use std::num::NonZeroU16;
+
 use crate::{ast, pool::Pool};
 
 #[derive(logos::Logos, Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,6 +189,7 @@ pub struct ObjectPools<'ast> {
     cond_blocks: Pool<ast::ConditionalBlock<'ast>, 4>,
     expr: Pool<ast::Expr<'ast>, 4>,
     stmt: Pool<ast::Stmt<'ast>, 16>,
+    types: Pool<ast::Type<'ast>, 4>,
     item: Pool<ast::Item<'ast>, 16>,
 }
 
@@ -226,6 +229,7 @@ impl ObjectPools<'_> {
             cond_blocks: self.cond_blocks.reuse(),
             expr: self.expr.reuse(),
             stmt: self.stmt.reuse(),
+            types: self.types.reuse(),
             item: self.item.reuse(),
         }
     }
@@ -488,6 +492,11 @@ impl<'ast, 'text> Parser<'ast, 'text> {
     fn parse_let(&mut self) -> &'ast ast::Let<'ast> {
         self.debug_expect(TokenKind::Let);
         let name = self.parse_ident();
+        let ty = if self.parse(TokenKind::Colon) {
+            Some(self.parse_type())
+        } else {
+            None
+        };
         let expr = if self.parse(TokenKind::Equal) {
             Some(self.parse_expr())
         } else {
@@ -495,7 +504,7 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         };
         self.ctx.alloc(ast::Let {
             binding: name,
-            ty: None,
+            ty,
             value: expr,
         })
     }
@@ -716,6 +725,98 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         let stmts = self.ctx.alloc_slice(&pool_stmts);
         self.pool.stmt.free(pool_stmts);
         ast::Block { stmts, expr }
+    }
+
+    fn parse_type(&mut self) -> ast::Type<'ast> {
+        let kind = match self.peek() {
+            TokenKind::Ident(ident) => {
+                if ident.starts_with(['i', 'u', 'f'])
+                    && ident[1..].as_bytes().iter().all(|x| x.is_ascii_digit())
+                {
+                    self.lexer.next_token();
+                    let bits = match ident[1..].parse::<u16>() {
+                        Ok(x) => x,
+                        Err(_) => unreachable!(),
+                    };
+
+                    let kind = match (ident.as_bytes()[0], bits) {
+                        (b'i', 0) => unreachable!(),
+                        (b'u', 0) => unreachable!(),
+                        (b'f', 32) => ast::TypePrimitive::Float32,
+                        (b'f', 64) => ast::TypePrimitive::Float64,
+                        (b'i', bits) => {
+                            let bits = NonZeroU16::new(bits).unwrap();
+                            ast::TypePrimitive::SInt { bits }
+                        }
+                        (b'u', bits) => {
+                            let bits = NonZeroU16::new(bits).unwrap();
+                            ast::TypePrimitive::UInt { bits }
+                        }
+                        (b'f', _) => unreachable!(),
+                        _ => unreachable!(),
+                    };
+
+                    ast::TypeKind::Primitive(kind)
+                } else if ident == "byte" {
+                    self.lexer.next_token();
+                    ast::TypeKind::Primitive(ast::TypePrimitive::Byte)
+                } else if ident == "void" {
+                    self.lexer.next_token();
+                    ast::TypeKind::Primitive(ast::TypePrimitive::Void)
+                } else {
+                    ast::TypeKind::Concrete(self.parse_type_concrete())
+                }
+            }
+            TokenKind::OpenParen => {
+                self.debug_expect(TokenKind::OpenParen);
+                ast::TypeKind::Tuple(self.parse_type_list(TokenKind::CloseParen))
+            }
+            TokenKind::Addr => {
+                self.lexer.next_token();
+                ast::TypeKind::Primitive(ast::TypePrimitive::Addr)
+            }
+            _ => unreachable!(),
+        };
+
+        ast::Type {
+            id: self.id_ctx.type_id(),
+            kind,
+        }
+    }
+
+    fn parse_type_list(&mut self, end: TokenKind) -> &'ast [ast::Type<'ast>] {
+        let mut pool_types = self.pool.types.alloc();
+        loop {
+            let ty = match self.peek() {
+                TokenKind::Eof => break,
+                tok if tok == end => break,
+                _ => self.parse_type(),
+            };
+            pool_types.push(ty);
+            if !self.parse(TokenKind::Comma) {
+                break;
+            }
+        }
+        let types = self.ctx.alloc_slice(&pool_types);
+        self.pool.types.free(pool_types);
+        self.debug_expect(end);
+        types
+    }
+
+    fn parse_type_concrete(&mut self) -> &'ast ast::TypeConcrete<'ast> {
+        // TODO: name should be a path
+        let name = self.parse_ident();
+        let generics = if self.parse(TokenKind::OpenSquare) {
+            self.parse_type_list(TokenKind::CloseSquare)
+        } else {
+            &[]
+        };
+        self.ctx.alloc(ast::TypeConcrete {
+            name: ast::Path {
+                segments: self.ctx.alloc_slice(&[name]),
+            },
+            generics,
+        })
     }
 }
 

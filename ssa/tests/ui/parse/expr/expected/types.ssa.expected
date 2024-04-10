@@ -1,0 +1,67 @@
+[
+    id: 1
+    kind:
+        Let:
+            binding:
+                id: 1
+                name: "x"
+            ty:
+                id: 10
+                kind:
+                    Tuple: [
+                        id: 1
+                        kind:
+                            Primitive: "Addr",
+                        id: 2
+                        kind:
+                            Primitive:
+                                UInt:
+                                    bits: 32,
+                        id: 3
+                        kind:
+                            Primitive:
+                                SInt:
+                                    bits: 32,
+                        id: 4
+                        kind:
+                            Primitive: "Float32",
+                        id: 5
+                        kind:
+                            Primitive: "Float64",
+                        id: 6
+                        kind:
+                            Primitive:
+                                SInt:
+                                    bits: 43,
+                        id: 7
+                        kind:
+                            Primitive:
+                                UInt:
+                                    bits: 52,
+                        id: 9
+                        kind:
+                            Concrete:
+                                name:
+                                    segments: [
+                                        id: 2
+                                        name: "Option"
+                                    ]
+                                generics: [
+                                    id: 8
+                                    kind:
+                                        Concrete:
+                                            name:
+                                                segments: [
+                                                    id: 3
+                                                    name: "T"
+                                                ]
+                                            generics: []
+                                ]
+                    ]
+            value:
+                id: 1
+                kind:
+                    Ident:
+                        id: 4
+                        name: "x"
+]
