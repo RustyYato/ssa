@@ -27,6 +27,5 @@ git = "https://github.com/RustyYato/logos.git"
 branch = "remove-unreachable-error"
 
 [workspace.dependencies.test-harness]
-# git = "https://github.com/RustyYato/test-harness.git"
-# branch = "main"
-path = "../test-harness/test-harness"
+git = "https://github.com/RustyYato/test-harness.git"
+branch = "main"
