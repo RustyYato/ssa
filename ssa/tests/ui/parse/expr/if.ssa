@@ -1,0 +1,8 @@
+if x {
+    let a = d;
+} else if y {
+    let b = e;
+} else {
+    let c = f;
+}
+

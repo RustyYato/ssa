@@ -360,22 +360,8 @@ impl<'ast, 'text> Parser<'ast, 'text> {
     pub fn parse_file(&mut self) -> &'ast [ast::Item<'ast>] {
         let mut items = self.pool.item.alloc();
 
-        loop {
-            let kind = match self.peek() {
-                TokenKind::Eof => break,
-                TokenKind::If => ast::ItemKind::If(self.parse_item_if()),
-                TokenKind::Let => {
-                    let item = ast::ItemKind::Let(self.parse_let());
-                    self.expect(TokenKind::Semicolon);
-                    item
-                }
-                _ => unreachable!(),
-            };
-
-            items.push(ast::Item {
-                id: self.id_ctx.item_id(),
-                kind,
-            });
+        while self.peek() != TokenKind::Eof {
+            items.push(self.parse_item());
         }
 
         let file = self.ctx.alloc_slice(&items);
@@ -383,6 +369,23 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         self.pool.item.free(items);
 
         file
+    }
+
+    fn parse_item(&mut self) -> ast::Item<'ast> {
+        let kind = match self.peek() {
+            TokenKind::If => ast::ItemKind::If(self.parse_item_if()),
+            TokenKind::Let => {
+                let item = ast::ItemKind::Let(self.parse_let());
+                self.expect(TokenKind::Semicolon);
+                item
+            }
+            _ => unreachable!(),
+        };
+
+        ast::Item {
+            id: self.id_ctx.item_id(),
+            kind,
+        }
     }
 
     fn parse_ident(&mut self) -> ast::Ident {
@@ -566,7 +569,16 @@ impl<'ast, 'text> Parser<'ast, 'text> {
     }
 
     fn parse_item_block(&mut self) -> ast::ItemBlock<'ast> {
-        todo!()
+        let mut pool_items = self.pool.item.alloc();
+        self.expect(TokenKind::OpenCurly);
+        while !matches!(self.peek(), TokenKind::CloseCurly | TokenKind::Eof) {
+            pool_items.push(self.parse_item());
+        }
+        self.expect(TokenKind::CloseCurly);
+        let items = self.ctx.alloc_slice(&pool_items);
+        self.pool.item.free(pool_items);
+
+        ast::ItemBlock { items }
     }
 
     fn parse_block(&mut self) -> ast::Block<'ast> {
