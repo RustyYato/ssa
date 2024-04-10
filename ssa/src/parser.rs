@@ -191,6 +191,8 @@ pub struct ObjectPools<'ast> {
     stmt: Pool<ast::Stmt<'ast>, 16>,
     types: Pool<ast::Type<'ast>, 4>,
     item: Pool<ast::Item<'ast>, 16>,
+    params: Pool<ast::TypeParam<'ast>, 4>,
+    fields: Pool<ast::Field<'ast>, 8>,
     ident: Pool<ast::Ident, 4>,
 }
 
@@ -233,6 +235,8 @@ impl ObjectPools<'_> {
             types: self.types.reuse(),
             ident: self.ident.reuse(),
             item: self.item.reuse(),
+            fields: self.fields.reuse(),
+            params: self.params.reuse(),
         }
     }
 }
@@ -554,6 +558,9 @@ impl<'ast, 'text> Parser<'ast, 'text> {
                 | TokenKind::Break
                 | TokenKind::Continue
                 | TokenKind::Return
+                | TokenKind::Struct
+                | TokenKind::Union
+                | TokenKind::Enum
         )
     }
 
@@ -589,7 +596,45 @@ impl<'ast, 'text> Parser<'ast, 'text> {
                     None
                 })
             }
-            _ => unreachable!(),
+            TokenKind::Struct => {
+                self.debug_expect(TokenKind::Struct);
+                let params = self.parse_type_params();
+                self.expect(TokenKind::OpenCurly);
+                let fields = self.parse_comma_seperated_until(
+                    TokenKind::CloseCurly,
+                    |pool| &mut pool.fields,
+                    Self::parse_field_definition,
+                );
+
+                ast::ExprKind::Struct(self.ctx.alloc(ast::ExprStruct { params, fields }))
+            }
+            TokenKind::Union => {
+                self.debug_expect(TokenKind::Union);
+                let params = self.parse_type_params();
+                self.expect(TokenKind::OpenCurly);
+                let variants = self.parse_comma_seperated_until(
+                    TokenKind::CloseCurly,
+                    |pool| &mut pool.fields,
+                    Self::parse_field_definition,
+                );
+
+                ast::ExprKind::Union(self.ctx.alloc(ast::ExprUnion { params, variants }))
+            }
+            TokenKind::Enum => {
+                self.debug_expect(TokenKind::Enum);
+                self.expect(TokenKind::OpenCurly);
+                let variants = self.parse_comma_seperated_until(
+                    TokenKind::CloseCurly,
+                    |pool| &mut pool.ident,
+                    Self::parse_ident,
+                );
+
+                ast::ExprKind::Enum(self.ctx.alloc(ast::ExprEnum { variants }))
+            }
+            _ => {
+                debug_assert!(!self.is_expr_start());
+                unreachable!()
+            }
         };
 
         ast::Expr {
@@ -598,28 +643,67 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         }
     }
 
-    fn parse_args_list(&mut self) -> &'ast [ast::Expr<'ast>] {
-        let mut args = self.pool.expr.alloc();
-        self.expect(TokenKind::OpenParen);
+    fn parse_type_params(&mut self) -> &'ast [ast::TypeParam<'ast>] {
+        if self.parse(TokenKind::OpenSquare) {
+            self.parse_comma_seperated_until(
+                TokenKind::CloseSquare,
+                |pool| &mut pool.params,
+                Self::parse_type_param,
+            )
+        } else {
+            &[]
+        }
+    }
+
+    fn parse_type_param(&mut self) -> ast::TypeParam<'ast> {
+        let name = self.parse_ident();
+        // TODO: implemnt  bounds
+        ast::TypeParam { name, bounds: [] }
+    }
+
+    fn parse_field_definition(&mut self) -> ast::Field<'ast> {
+        let name = self.parse_ident();
+        self.expect(TokenKind::Colon);
+        let ty = self.parse_type();
+        ast::Field { name, ty }
+    }
+
+    fn parse_comma_seperated_until<T: Copy, const N: usize>(
+        &mut self,
+        end: TokenKind,
+        pool: impl for<'a> Fn(&'a mut ObjectPools<'ast>) -> &'a mut Pool<T, N>,
+        mut item: impl FnMut(&mut Self) -> T,
+    ) -> &'ast [T] {
+        let mut args = pool(&mut self.pool).alloc();
         loop {
             match self.peek() {
-                TokenKind::CloseParen | TokenKind::Eof => break,
+                TokenKind::Eof => break,
+                tok if tok == end => break,
                 _ => (),
             }
 
-            args.push(self.parse_expr());
+            args.push(item(self));
 
             if !self.parse(TokenKind::Comma) {
                 break;
             }
         }
-        self.expect(TokenKind::CloseParen);
+        self.expect(end);
 
         let args_list = self.ctx.alloc_slice(&args);
 
-        self.pool.expr.free(args);
+        pool(&mut self.pool).free(args);
 
         args_list
+    }
+
+    fn parse_args_list(&mut self) -> &'ast [ast::Expr<'ast>] {
+        self.expect(TokenKind::OpenParen);
+        self.parse_comma_seperated_until(
+            TokenKind::CloseParen,
+            |pool| &mut pool.expr,
+            Self::parse_expr,
+        )
     }
 
     fn finish_expr_postfix(
@@ -785,7 +869,16 @@ impl<'ast, 'text> Parser<'ast, 'text> {
             }
             TokenKind::OpenParen => {
                 self.debug_expect(TokenKind::OpenParen);
-                ast::TypeKind::Tuple(self.parse_type_list(TokenKind::CloseParen))
+                let tys = self.parse_type_list(TokenKind::CloseParen);
+                if tys.is_empty() {
+                    ast::TypeKind::Primitive(ast::TypePrimitive::Unit)
+                } else {
+                    ast::TypeKind::Tuple(tys)
+                }
+            }
+            TokenKind::Type => {
+                self.debug_expect(TokenKind::Type);
+                ast::TypeKind::Type { universe: u32::MAX }
             }
             TokenKind::Addr => {
                 self.lexer.next_token();
@@ -800,32 +893,21 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         }
     }
 
-    fn parse_type_list(&mut self, end: TokenKind) -> &'ast [ast::Type<'ast>] {
-        let mut pool_types = self.pool.types.alloc();
-        loop {
-            let ty = match self.peek() {
-                TokenKind::Eof => break,
-                tok if tok == end => break,
-                _ => self.parse_type(),
-            };
-            pool_types.push(ty);
-            if !self.parse(TokenKind::Comma) {
-                break;
-            }
+    fn parse_generics(&mut self) -> &'ast [ast::Type<'ast>] {
+        if self.parse(TokenKind::OpenSquare) {
+            self.parse_type_list(TokenKind::CloseSquare)
+        } else {
+            &[]
         }
-        let types = self.ctx.alloc_slice(&pool_types);
-        self.pool.types.free(pool_types);
-        self.debug_expect(end);
-        types
+    }
+
+    fn parse_type_list(&mut self, end: TokenKind) -> &'ast [ast::Type<'ast>] {
+        self.parse_comma_seperated_until(end, |pool| &mut pool.types, Self::parse_type)
     }
 
     fn parse_type_concrete(&mut self) -> &'ast ast::TypeConcrete<'ast> {
         let name = self.parse_path(None);
-        let generics = if self.parse(TokenKind::OpenSquare) {
-            self.parse_type_list(TokenKind::CloseSquare)
-        } else {
-            &[]
-        };
+        let generics = self.parse_generics();
         self.ctx.alloc(ast::TypeConcrete { name, generics })
     }
 }

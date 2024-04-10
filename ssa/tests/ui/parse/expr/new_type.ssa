@@ -1,0 +1,12 @@
+let Option = union[T] {
+    Some: T,
+    None: (),
+};
+let Pair = struct[T, U] {
+    first: T,
+    second: U,
+};
+let Tag = enum {
+    Some,
+    None,
+};

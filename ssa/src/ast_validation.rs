@@ -81,6 +81,14 @@ fn test() {
     validate(&[], &mut errors);
     assert!(!errors.0);
 
+    let file = crate::parse(
+        b"
+    let Option = union[T] {
+        Some: T,
+        None: (),
+    };",
+    );
+
     validate(
         &[ast::Item {
             id: ast::ItemId::from_u32(1),

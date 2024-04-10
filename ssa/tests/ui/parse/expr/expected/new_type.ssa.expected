@@ -1,0 +1,107 @@
+[
+    id: 1
+    kind:
+        Let:
+            binding:
+                id: 1
+                name: "Option"
+            ty: null
+            value:
+                id: 1
+                kind:
+                    Union:
+                        params: [
+                            name:
+                                id: 2
+                                name: "T"
+                            bounds: []
+                        ]
+                        variants: [
+                            name:
+                                id: 3
+                                name: "Some"
+                            ty:
+                                id: 1
+                                kind:
+                                    Concrete:
+                                        name:
+                                            segments: [
+                                                id: 4
+                                                name: "T"
+                                            ]
+                                        generics: [],
+                            name:
+                                id: 5
+                                name: "None"
+                            ty:
+                                id: 2
+                                kind:
+                                    Primitive: "Unit"
+                        ],
+    id: 2
+    kind:
+        Let:
+            binding:
+                id: 6
+                name: "Pair"
+            ty: null
+            value:
+                id: 2
+                kind:
+                    Struct:
+                        params: [
+                            name:
+                                id: 7
+                                name: "T"
+                            bounds: [],
+                            name:
+                                id: 8
+                                name: "U"
+                            bounds: []
+                        ]
+                        fields: [
+                            name:
+                                id: 9
+                                name: "first"
+                            ty:
+                                id: 3
+                                kind:
+                                    Concrete:
+                                        name:
+                                            segments: [
+                                                id: 10
+                                                name: "T"
+                                            ]
+                                        generics: [],
+                            name:
+                                id: 11
+                                name: "second"
+                            ty:
+                                id: 4
+                                kind:
+                                    Concrete:
+                                        name:
+                                            segments: [
+                                                id: 12
+                                                name: "U"
+                                            ]
+                                        generics: []
+                        ],
+    id: 3
+    kind:
+        Let:
+            binding:
+                id: 13
+                name: "Tag"
+            ty: null
+            value:
+                id: 3
+                kind:
+                    Enum:
+                        variants: [
+                            id: 14
+                            name: "Some",
+                            id: 15
+                            name: "None"
+                        ]
+]

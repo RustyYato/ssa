@@ -797,6 +797,7 @@ pub enum TypeKind<'ast> {
     Concrete(&'ast TypeConcrete<'ast>),
     /// The type of types
     Type {
+        // u32::MAX means unknown universe
         universe: u32,
     },
 }
