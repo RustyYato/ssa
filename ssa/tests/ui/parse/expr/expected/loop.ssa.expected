@@ -1,0 +1,30 @@
+[
+    id: 1
+    kind:
+        Let:
+            binding:
+                id: 1
+                name: "foo"
+            ty: null
+            value:
+                id: 2
+                kind:
+                    Loop:
+                        block:
+                            stmts: [
+                                id: 1
+                                kind:
+                                    Let:
+                                        binding:
+                                            id: 2
+                                            name: "x"
+                                        ty: null
+                                        value:
+                                            id: 1
+                                            kind:
+                                                Ident:
+                                                    id: 3
+                                                    name: "x"
+                            ]
+                            expr: null
+]

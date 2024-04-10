@@ -158,10 +158,10 @@ struct PeekingLexer<'text, const N: usize> {
     lexer: Lexer<'text>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Token<'text> {
     kind: TokenKind<'text>,
-    lexeme: &'text [u8],
+    lexeme: &'text bstr::BStr,
     line_start: u32,
     col_start: u32,
     line_end: u32,
@@ -259,7 +259,7 @@ impl<'text> Lexer<'text> {
             if !matches!(kind, TokenKind::Newline | TokenKind::WhiteSpace) {
                 return Token {
                     kind,
-                    lexeme,
+                    lexeme: bstr::BStr::new(lexeme),
                     line_start,
                     col_start,
                     line_end,
@@ -392,6 +392,7 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         let kind = match self.peek() {
             TokenKind::If => ast::StmtKind::If(self.parse_if()),
             TokenKind::Let => ast::StmtKind::Let(self.parse_let()),
+            TokenKind::Loop => ast::StmtKind::Loop(self.parse_loop()),
             _ => ast::StmtKind::Expr(self.ctx.alloc(self.parse_expr())),
         };
 
@@ -478,6 +479,12 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         })
     }
 
+    fn parse_loop(&mut self) -> &'ast ast::Loop<'ast> {
+        self.debug_expect(TokenKind::Loop);
+        let block = self.parse_block();
+        self.ctx.alloc(ast::Loop { block })
+    }
+
     fn parse_let(&mut self) -> &'ast ast::Let<'ast> {
         self.debug_expect(TokenKind::Let);
         let name = self.parse_ident();
@@ -518,6 +525,7 @@ impl<'ast, 'text> Parser<'ast, 'text> {
             }
             TokenKind::OpenCurly => ast::ExprKind::Block(self.ctx.alloc(self.parse_block())),
             TokenKind::If => ast::ExprKind::If(self.parse_if()),
+            TokenKind::Loop => ast::ExprKind::Loop(self.parse_loop()),
             _ => unreachable!(),
         };
 

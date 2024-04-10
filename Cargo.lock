@@ -532,6 +532,7 @@ checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 name = "ssa"
 version = "0.1.0"
 dependencies = [
+ "bstr",
  "bumpalo",
  "erasable",
  "istr",
@@ -579,7 +580,6 @@ dependencies = [
 [[package]]
 name = "test-harness"
 version = "0.1.0"
-source = "git+https://github.com/RustyYato/test-harness.git?branch=main#c5dbaf27215f96ad149abf01152c38942da600f4"
 dependencies = [
  "backtrace",
  "bstr",

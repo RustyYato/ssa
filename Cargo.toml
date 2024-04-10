@@ -12,6 +12,7 @@ slice-dst = "1"
 erasable = "1.2"
 ref-cast = "1"
 bumpalo = "3"
+bstr = "1"
 yoke = { version = "0.7", features = ["derive"] }
 stable_deref_trait = { version = "1" }
 linkme = "0.3.25"
@@ -27,5 +28,6 @@ git = "https://github.com/RustyYato/logos.git"
 branch = "remove-unreachable-error"
 
 [workspace.dependencies.test-harness]
-git = "https://github.com/RustyYato/test-harness.git"
-branch = "main"
+# git = "https://github.com/RustyYato/test-harness.git"
+# branch = "main"
+path = "../test-harness/test-harness"
