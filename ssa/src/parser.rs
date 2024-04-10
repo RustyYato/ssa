@@ -266,7 +266,10 @@ impl<'text> Lexer<'text> {
             let line_end = self.line;
             let col_end = self.col;
 
-            if !matches!(kind, TokenKind::Newline | TokenKind::WhiteSpace) {
+            if !matches!(
+                kind,
+                TokenKind::Newline | TokenKind::WhiteSpace | TokenKind::LineComment
+            ) {
                 return Token {
                     kind,
                     lexeme: bstr::BStr::new(lexeme),
