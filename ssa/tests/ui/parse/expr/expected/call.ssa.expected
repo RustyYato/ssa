@@ -1,0 +1,31 @@
+[
+    id: 1
+    kind:
+        Let:
+            binding:
+                id: 1
+                name: "x"
+            ty: null
+            value:
+                id: 4
+                kind:
+                    Call:
+                        func:
+                            id: 1
+                            kind:
+                                Ident:
+                                    id: 2
+                                    name: "x"
+                        args: [
+                            id: 2
+                            kind:
+                                Ident:
+                                    id: 3
+                                    name: "x",
+                            id: 3
+                            kind:
+                                Ident:
+                                    id: 4
+                                    name: "x"
+                        ]
+]
