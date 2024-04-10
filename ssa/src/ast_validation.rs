@@ -89,60 +89,19 @@ fn test() {
     };",
     );
 
-    validate(
-        &[ast::Item {
-            id: ast::ItemId::from_u32(1),
-            kind: ast::ItemKind::Let(&ast::Let {
-                binding: ast::Ident {
-                    id: ast::IdentId::from_u32(1),
-                    name: istr::IStr::new("Option"),
-                },
-                ty: None,
-                value: Some(ast::Expr {
-                    id: ast::ExprId::from_u32(1),
-                    kind: ast::ExprKind::Union(&ast::ExprUnion {
-                        params: &[ast::TypeParam {
-                            name: ast::Ident {
-                                id: ast::IdentId::from_u32(2),
-                                name: istr::IStr::new("T"),
-                            },
-                            bounds: [],
-                        }],
-                        variants: &[
-                            ast::Field {
-                                name: ast::Ident {
-                                    id: ast::IdentId::from_u32(2),
-                                    name: istr::IStr::new("Some"),
-                                },
-                                ty: ast::Type {
-                                    id: ast::TypeId::from_u32(1),
-                                    kind: ast::TypeKind::Concrete(&ast::TypeConcrete {
-                                        name: ast::Path {
-                                            segments: &[ast::Ident {
-                                                id: ast::IdentId::from_u32(3),
-                                                name: istr::IStr::new("T"),
-                                            }],
-                                        },
-                                        generics: &[],
-                                    }),
-                                },
-                            },
-                            ast::Field {
-                                name: ast::Ident {
-                                    id: ast::IdentId::from_u32(4),
-                                    name: istr::IStr::new("None"),
-                                },
-                                ty: ast::Type {
-                                    id: ast::TypeId::from_u32(2),
-                                    kind: ast::TypeKind::Primitive(ast::TypePrimitive::Unit),
-                                },
-                            },
-                        ],
-                    }),
-                }),
-            }),
-        }],
-        &mut errors,
-    );
+    validate(file.as_ref().items, &mut errors);
     assert!(!errors.0);
+
+    let file = crate::parse(
+        b"
+    let Option = if true {
+        union[T] {
+            Some: T,
+            None: (),
+        }
+    };",
+    );
+
+    validate(file.as_ref().items, &mut errors);
+    assert!(errors.0);
 }
