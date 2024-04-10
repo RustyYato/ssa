@@ -14,3 +14,13 @@ yoke.workspace = true
 stable_deref_trait.workspace = true
 smallvec.workspace = true
 logos.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+test-harness.workspace = true
+linkme.workspace = true
+serde_gura.workspace = true
+
+[[test]]
+name = "ui"
+harness = false

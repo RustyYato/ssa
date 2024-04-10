@@ -168,7 +168,7 @@ pub trait Trivial {}
 impl<T: Copy> Trivial for T {}
 impl<T: Trivial> Trivial for [T] {}
 
-pub trait Visit<'ast>: Trivial {
+pub trait Visit<'ast>: Trivial + serde::Serialize {
     fn visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V);
 
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V);
@@ -220,7 +220,8 @@ pub struct IdCtx {
 macro_rules! make_id {
     ($name:ident $field:ident $func:ident) => {
         #[repr(transparent)]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        #[derive(Debug, serde::Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        #[serde(transparent)]
         pub struct $name(NonZeroU32);
 
         impl $name {
@@ -252,10 +253,15 @@ macro_rules! make_id {
     };
 }
 
+fn istr_serialize<S: serde::Serializer>(value: &istr::IStr, ser: S) -> Result<S::Ok, S::Error> {
+    ser.serialize_str(value.to_str())
+}
+
 make_id!(IdentId idents ident_id);
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Ident {
     pub id: IdentId,
+    #[serde(serialize_with = "istr_serialize")]
     pub name: istr::IStr,
 }
 
@@ -267,7 +273,7 @@ impl<'ast> Visit<'ast> for Ident {
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, _v: &mut V) {}
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Path<'ast> {
     pub segments: &'ast [Ident],
 }
@@ -286,13 +292,13 @@ impl<'ast> Visit<'ast> for Path<'ast> {
 }
 
 make_id!(ItemId items item_id);
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Item<'ast> {
     pub id: ItemId,
     pub kind: ItemKind<'ast>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum ItemKind<'ast> {
     If(&'ast ItemIf<'ast>),
     Let(&'ast Let<'ast>),
@@ -313,13 +319,13 @@ impl<'ast> Visit<'ast> for Item<'ast> {
 }
 
 make_id!(StmtId stmts stmt_id);
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Stmt<'ast> {
     pub id: StmtId,
     pub kind: StmtKind<'ast>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum StmtKind<'ast> {
     If(&'ast If<'ast>),
     Loop(&'ast Loop<'ast>),
@@ -344,13 +350,13 @@ impl<'ast> Visit<'ast> for Stmt<'ast> {
 }
 
 make_id!(ExprId exprs expr_id);
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Expr<'ast> {
     pub id: ExprId,
     pub kind: ExprKind<'ast>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum ExprKind<'ast> {
     Ident(&'ast Ident),
     Path(&'ast Path<'ast>),
@@ -398,7 +404,7 @@ impl<'ast> Visit<'ast> for Expr<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum BinOp {
     // int op int => int
     Add,
@@ -416,7 +422,7 @@ pub enum BinOp {
     CmpLe,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ExprBinOp<'ast> {
     pub left: Expr<'ast>,
     pub op: BinOp,
@@ -435,7 +441,7 @@ impl<'ast> Visit<'ast> for ExprBinOp<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum UnaryOp {
     // bool => int
     IntFromBool,
@@ -448,7 +454,7 @@ pub enum UnaryOp {
     Neg,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ExprUnaryOp<'ast> {
     pub op: UnaryOp,
     pub value: Expr<'ast>,
@@ -465,7 +471,7 @@ impl<'ast> Visit<'ast> for ExprUnaryOp<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ExprCall<'ast> {
     pub func: Expr<'ast>,
     pub args: &'ast [Expr<'ast>],
@@ -483,13 +489,13 @@ impl<'ast> Visit<'ast> for ExprCall<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ExprFunc<'ast> {
     pub params: &'ast [FuncParam<'ast>],
     pub body: Block<'ast>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct FuncParam<'ast> {
     pub name: Ident,
     pub _lt: core::marker::PhantomData<&'ast ()>,
@@ -518,7 +524,7 @@ impl<'ast> Visit<'ast> for ExprFunc<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ExprStruct<'ast> {
     pub params: &'ast [TypeParam<'ast>],
     pub fields: &'ast [Field<'ast>],
@@ -536,7 +542,7 @@ impl<'ast> Visit<'ast> for ExprStruct<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ExprUnion<'ast> {
     pub params: &'ast [TypeParam<'ast>],
     pub variants: &'ast [Field<'ast>],
@@ -554,7 +560,7 @@ impl<'ast> Visit<'ast> for ExprUnion<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ExprEnum<'ast> {
     pub variants: &'ast [Ident],
 }
@@ -570,7 +576,7 @@ impl<'ast> Visit<'ast> for ExprEnum<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct TypeParam<'ast> {
     pub name: Ident,
     pub bounds: [&'ast (); 0],
@@ -587,7 +593,7 @@ impl<'ast> Visit<'ast> for TypeParam<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Field<'ast> {
     pub name: Ident,
     pub ty: Type<'ast>,
@@ -605,7 +611,7 @@ impl<'ast> Visit<'ast> for Field<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Block<'ast> {
     pub stmts: &'ast [Stmt<'ast>],
     pub expr: Option<Expr<'ast>>,
@@ -623,7 +629,7 @@ impl<'ast> Visit<'ast> for Block<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ConditionalBlock<'ast> {
     pub cond: Expr<'ast>,
     pub block: Block<'ast>,
@@ -641,7 +647,7 @@ impl<'ast> Visit<'ast> for ConditionalBlock<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ItemBlock<'ast> {
     pub items: &'ast [Item<'ast>],
 }
@@ -657,7 +663,7 @@ impl<'ast> Visit<'ast> for ItemBlock<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ConditionalItemBlock<'ast> {
     pub cond: Expr<'ast>,
     pub block: ItemBlock<'ast>,
@@ -675,7 +681,7 @@ impl<'ast> Visit<'ast> for ConditionalItemBlock<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct ItemIf<'ast> {
     /// should have at least one block
     pub blocks: &'ast [ConditionalItemBlock<'ast>],
@@ -696,7 +702,7 @@ impl<'ast> Visit<'ast> for ItemIf<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct If<'ast> {
     /// should have at least one block
     pub blocks: &'ast [ConditionalBlock<'ast>],
@@ -717,7 +723,7 @@ impl<'ast> Visit<'ast> for If<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Loop<'ast> {
     pub block: Block<'ast>,
 }
@@ -733,7 +739,7 @@ impl<'ast> Visit<'ast> for Loop<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Let<'ast> {
     pub binding: Ident,
     pub ty: Option<Type<'ast>>,
@@ -754,13 +760,13 @@ impl<'ast> Visit<'ast> for Let<'ast> {
 }
 
 make_id!(TypeId types type_id);
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct Type<'ast> {
     pub id: TypeId,
     pub kind: TypeKind<'ast>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum TypeKind<'ast> {
     Primitive(TypePrimitive),
     Concrete(&'ast TypeConcrete<'ast>),
@@ -785,7 +791,7 @@ impl<'ast> Visit<'ast> for Type<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub struct TypeConcrete<'ast> {
     pub name: Path<'ast>,
     pub generics: &'ast [Type<'ast>],
@@ -803,7 +809,7 @@ impl<'ast> Visit<'ast> for TypeConcrete<'ast> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum TypePrimitive {
     /// A type with one trivial constructor
     Unit,

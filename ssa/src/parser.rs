@@ -21,6 +21,8 @@ enum TokenKind<'s> {
     Newline,
     #[regex(r"\p{White_Space}")]
     WhiteSpace,
+    #[regex(r"#[^\n]*")]
+    LineComment,
 
     #[regex(r"[_\p{XID_Start}]\p{XID_Continue}*", |lexer| {
         let ident = lexer.slice();
@@ -91,8 +93,6 @@ enum TokenKind<'s> {
     Pipe2,
     #[token("^")]
     Caret,
-    #[token("#")]
-    Pound,
     #[token("!")]
     Bang,
     #[token("@")]
@@ -204,12 +204,26 @@ enum ExprPrec {
 }
 
 impl AstContext {
+    pub fn reset(&mut self) {
+        self.generic.reset();
+    }
+
     fn alloc<T: Copy>(&self, x: T) -> &T {
         self.generic.alloc(x)
     }
 
     fn alloc_slice<T: Copy>(&self, x: &[T]) -> &[T] {
         self.generic.alloc_slice_copy(x)
+    }
+}
+
+impl ObjectPools<'_> {
+    pub fn clear<'a>(self) -> ObjectPools<'a> {
+        ObjectPools {
+            cond_item_blocks: self.cond_item_blocks.reuse(),
+            expr: self.expr.reuse(),
+            item: self.item.reuse(),
+        }
     }
 }
 
@@ -577,13 +591,4 @@ fn test_if() {
     ]));
     let lexer = logos::Lexer::<TokenKind>::new(b"elseif");
     assert!(lexer.eq([Ok(TokenKind::Ident("elseif")); 1]));
-}
-
-#[test]
-fn test_expr() {
-    let ctx = AstContext::default();
-    let mut parser = Parser::new(&ctx, ObjectPools::default(), b"let x = ast + b + x;");
-    let expr = parser.parse_file();
-    dbg!(expr);
-    panic!()
 }

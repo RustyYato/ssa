@@ -1,0 +1,15 @@
+[
+    id: 1
+    kind:
+        Let:
+            binding:
+                id: 1
+                name: "x"
+            ty: null
+            value:
+                id: 1
+                kind:
+                    Ident:
+                        id: 2
+                        name: "x"
+]
