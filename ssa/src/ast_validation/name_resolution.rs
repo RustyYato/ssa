@@ -115,7 +115,7 @@ fn test_basic_name_resolution() {
     let res = resolve_names(file.as_ref().items);
 
     assert_eq!(
-        res,
+        res.id_map,
         HashMap::from_iter([
             (ast::IdentId::from_u32(8), ast::IdentId::from_u32(5)),
             (ast::IdentId::from_u32(2), ast::IdentId::from_u32(3)),
