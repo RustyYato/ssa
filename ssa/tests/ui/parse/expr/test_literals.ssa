@@ -1,0 +1,6 @@
+let x = 1e30;
+let x = 1E+30;
+let x = 1E-30;
+let x = 1.42E+30;
+let x = -1.42e-30;
+let x = 1.42;

@@ -35,6 +35,20 @@ pub enum TokenKind<'s> {
     })]
     Ident(&'s str),
 
+    #[regex(r"[0-9]+")]
+    DecimalIntegerLiteral,
+    #[regex(r"0x[0-9a-fA-F]+")]
+    HexIntegerLiteral,
+    #[regex(r"0o[0-7]+")]
+    OctalIntegerLiteral,
+    #[regex(r"0b[01]+")]
+    BinaryIntegerLiteral,
+
+    #[regex(r"-?[0-9]+\.[0-9]+")]
+    #[regex(r"-?[0-9]+[eE][+-]?[0-9]+")]
+    #[regex(r"-?[0-9]+\.[0-9]+[eE][+-]?[0-9]+")]
+    FloatLiteral,
+
     #[token(",")]
     Comma,
     #[token(":")]
@@ -151,6 +165,10 @@ pub trait ParseError<'text> {
 
     fn expected(&mut self, token: TokenKind, found: &[Token<'text>]);
 
+    fn unrepresentable_int_literal(&mut self, found: &[Token<'text>]);
+
+    fn unrepresentable_float_literal(&mut self, found: &[Token<'text>]);
+
     fn had_errors(self) -> HadErrors<Self>
     where
         Self: Sized,
@@ -211,6 +229,14 @@ impl<'text> ParseError<'text> for HadErrors {
     fn expected(&mut self, token: TokenKind, found: &[Token<'text>]) {
         self.had_errors = true;
     }
+
+    fn unrepresentable_int_literal(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+
+    fn unrepresentable_float_literal(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+    }
 }
 
 impl<'text, T: ParseError<'text>> ParseError<'text> for HadErrors<T> {
@@ -252,6 +278,16 @@ impl<'text, T: ParseError<'text>> ParseError<'text> for HadErrors<T> {
     fn expected(&mut self, token: TokenKind, found: &[Token<'text>]) {
         self.had_errors = true;
         self.errors.expected(token, found)
+    }
+
+    fn unrepresentable_int_literal(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.unrepresentable_int_literal(found)
+    }
+
+    fn unrepresentable_float_literal(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.unrepresentable_float_literal(found)
     }
 }
 
@@ -303,6 +339,14 @@ impl<'text> ParseError<'text> for PanicDebugParseError {
             "Invalid token: expected {kind:?}, but found {:?}",
             found[0].kind,
         )
+    }
+
+    fn unrepresentable_int_literal(&mut self, found: &[Token<'text>]) {
+        panic!("Unrepresentable int literal: {found:?}")
+    }
+
+    fn unrepresentable_float_literal(&mut self, found: &[Token<'text>]) {
+        panic!("Unrepresentable float literal: {found:?}")
     }
 }
 
@@ -531,9 +575,9 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
         }
     }
 
-    fn debug_expect(&mut self, kind: TokenKind) {
+    fn debug_expect(&mut self, kind: TokenKind) -> Token<'text> {
         debug_assert_eq!(self.lexer.peek[0].kind, kind);
-        self.lexer.next_token();
+        self.lexer.next_token()
     }
 
     fn expect(&mut self, kind: TokenKind) {
@@ -823,6 +867,76 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
                 );
 
                 ast::ExprKind::Enum(self.ctx.alloc(ast::ExprEnum { variants }))
+            }
+            TokenKind::DecimalIntegerLiteral => {
+                let peek = self.lexer.peek;
+                let token = self.debug_expect(TokenKind::DecimalIntegerLiteral);
+                let lexeme: &[u8] = token.lexeme.as_ref();
+                let lexeme = unsafe { core::str::from_utf8_unchecked(lexeme) };
+
+                ast::ExprKind::IntLiteral(match lexeme.parse() {
+                    Ok(value) => value,
+                    Err(_) => {
+                        self.errors.unrepresentable_int_literal(&peek);
+                        0
+                    }
+                })
+            }
+            TokenKind::HexIntegerLiteral => {
+                let peek = self.lexer.peek;
+                let token = self.debug_expect(TokenKind::DecimalIntegerLiteral);
+                let lexeme: &[u8] = token.lexeme.as_ref();
+                let lexeme = unsafe { core::str::from_utf8_unchecked(&lexeme[2..]) };
+
+                ast::ExprKind::IntLiteral(match u128::from_str_radix(lexeme, 16) {
+                    Ok(value) => value,
+                    Err(_) => {
+                        self.errors.unrepresentable_int_literal(&peek);
+                        0
+                    }
+                })
+            }
+            TokenKind::OctalIntegerLiteral => {
+                let peek = self.lexer.peek;
+                let token = self.debug_expect(TokenKind::DecimalIntegerLiteral);
+                let lexeme: &[u8] = token.lexeme.as_ref();
+                let lexeme = unsafe { core::str::from_utf8_unchecked(&lexeme[2..]) };
+
+                ast::ExprKind::IntLiteral(match u128::from_str_radix(lexeme, 8) {
+                    Ok(value) => value,
+                    Err(_) => {
+                        self.errors.unrepresentable_int_literal(&peek);
+                        0
+                    }
+                })
+            }
+            TokenKind::BinaryIntegerLiteral => {
+                let peek = self.lexer.peek;
+                let token = self.debug_expect(TokenKind::DecimalIntegerLiteral);
+                let lexeme: &[u8] = token.lexeme.as_ref();
+                let lexeme = unsafe { core::str::from_utf8_unchecked(&lexeme[2..]) };
+
+                ast::ExprKind::IntLiteral(match u128::from_str_radix(lexeme, 2) {
+                    Ok(value) => value,
+                    Err(_) => {
+                        self.errors.unrepresentable_int_literal(&peek);
+                        0
+                    }
+                })
+            }
+            TokenKind::FloatLiteral => {
+                let peek = self.lexer.peek;
+                let token = self.debug_expect(TokenKind::FloatLiteral);
+                let lexeme: &[u8] = token.lexeme.as_ref();
+                let lexeme = unsafe { core::str::from_utf8_unchecked(lexeme) };
+
+                ast::ExprKind::FloatLiteral(match lexeme.parse() {
+                    Ok(value) => value,
+                    Err(_) => {
+                        self.errors.unrepresentable_float_literal(&peek);
+                        f64::NAN
+                    }
+                })
             }
             _ => {
                 debug_assert!(!self.is_expr_start());

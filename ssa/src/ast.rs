@@ -382,6 +382,9 @@ pub struct Expr<'ast> {
 
 #[derive(Debug, Clone, Copy, serde::Serialize)]
 pub enum ExprKind<'ast> {
+    IntLiteral(u128),
+    FloatLiteral(f64),
+
     Ident(&'ast Ident),
     Path(&'ast Path<'ast>),
     BinOp(&'ast ExprBinOp<'ast>),
@@ -413,6 +416,8 @@ impl<'ast> Visit<'ast> for Expr<'ast> {
     fn default_visit<V: Visitor<'ast> + ?Sized>(&'ast self, v: &mut V) {
         let Self { id, ref kind } = *self;
         match kind {
+            ExprKind::IntLiteral(_) => (),
+            ExprKind::FloatLiteral(_) => (),
             ExprKind::Ident(expr) => v.visit_expr_ident(id, expr),
             ExprKind::Path(expr) => v.visit_expr_path(id, expr),
             ExprKind::BinOp(expr) => expr.visit(v),

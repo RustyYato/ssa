@@ -108,4 +108,12 @@ impl<'text> ssa::parser::ParseError<'text> for TestError {
     fn expected(&mut self, token: ssa::parser::TokenKind, found: &[ssa::parser::Token<'text>]) {
         self.errors.push(format!("expected {token:?} {found:#?}"))
     }
+
+    fn unrepresentable_int_literal(&mut self, found: &[ssa::parser::Token<'text>]) {
+        self.errors.push(format!("invalid int {found:#?}"))
+    }
+
+    fn unrepresentable_float_literal(&mut self, found: &[ssa::parser::Token<'text>]) {
+        self.errors.push(format!("invalid int {found:#?}"))
+    }
 }
