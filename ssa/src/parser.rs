@@ -149,6 +149,8 @@ pub trait ParseError<'text> {
 
     fn unsupported_float_bits(&mut self, bits: u16, tokens: &[Token<'text>]);
 
+    fn expected(&mut self, token: TokenKind, found: &[Token<'text>]);
+
     fn had_errors(self) -> HadErrors<Self>
     where
         Self: Sized,
@@ -205,6 +207,10 @@ impl<'text> ParseError<'text> for HadErrors {
     fn unsupported_float_bits(&mut self, bits: u16, tokens: &[Token<'text>]) {
         self.had_errors = true;
     }
+
+    fn expected(&mut self, token: TokenKind, found: &[Token<'text>]) {
+        self.had_errors = true;
+    }
 }
 
 impl<'text, T: ParseError<'text>> ParseError<'text> for HadErrors<T> {
@@ -241,6 +247,11 @@ impl<'text, T: ParseError<'text>> ParseError<'text> for HadErrors<T> {
     fn unsupported_float_bits(&mut self, bits: u16, tokens: &[Token<'text>]) {
         self.had_errors = true;
         self.errors.unsupported_float_bits(bits, tokens)
+    }
+
+    fn expected(&mut self, token: TokenKind, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.expected(token, found)
     }
 }
 
@@ -286,6 +297,13 @@ impl<'text> ParseError<'text> for PanicDebugParseError {
     fn unsupported_float_bits(&mut self, bits: u16, _tokens: &[Token<'text>]) {
         panic!("{} bit floats are unsupported", bits)
     }
+
+    fn expected(&mut self, kind: TokenKind, found: &[Token<'text>]) {
+        panic!(
+            "Invalid token: expected {kind:?}, but found {:?}",
+            found[0].kind,
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -293,8 +311,7 @@ pub enum LexerError {}
 
 impl Default for LexerError {
     fn default() -> Self {
-        extern "C" {
-            #[link_name = "lexer.error.unreachable.default.this should intentionally not link to anything"]
+        extern "C-unwind" {
             fn __lexer_error_unreachable_default() -> !;
         }
 
@@ -523,10 +540,7 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
         if self.lexer.peek[0].kind == kind {
             self.lexer.next_token();
         } else {
-            panic!(
-                "Invalid token: expected {kind:?}, but found {:?}",
-                self.lexer.peek[0].kind,
-            )
+            self.errors.expected(kind, &self.lexer.peek);
         }
     }
 
@@ -557,6 +571,7 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
                 item
             }
             _ => {
+                self.lexer.next_token();
                 self.errors.expected_item(&self.lexer.peek);
                 ast::ItemKind::Error
             }
