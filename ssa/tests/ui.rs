@@ -42,13 +42,14 @@ impl test_harness::PathTestRunner for UiTestCorpus {
             if errors.had_errors {
                 Ok(Some(Ok(errors.errors.errors.join("\n"))))
             } else {
-                match serde_gura::to_string(&file) {
-                    Ok(file) => Ok(Some(Ok(file))),
-                    Err(err) => Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        err.to_string(),
-                    )),
-                }
+                Ok(Some(Ok(test_harness::to_string(file))))
+                // match serde_gura::to_string(&file) {
+                //     Ok(file) => Ok(Some(Ok(file))),
+                //     Err(err) => Err(std::io::Error::new(
+                //         std::io::ErrorKind::Other,
+                //         err.to_string(),
+                //     )),
+                // }
             }
         })
     }

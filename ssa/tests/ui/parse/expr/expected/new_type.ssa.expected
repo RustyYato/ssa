@@ -1,107 +1,174 @@
 [
-    id: 1
-    kind:
-        Let:
-            binding:
-                id: 1
-                name: "Option"
-            ty: null
-            value:
-                id: 1
-                kind:
-                    Union:
-                        params: [
-                            name:
-                                id: 2
+  Item {
+    id: ItemId(1)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(1)
+          name: "Option"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(1)
+            kind: ExprKind::Union(ExprUnion {
+                params: [
+                  TypeParam {
+                    name: Ident {
+                      id: IdentId(2)
+                      name: "T"
+                    }
+                    bounds: (
+                    )
+                  }
+                ]
+                variants: [
+                  Field {
+                    name: Ident {
+                      id: IdentId(3)
+                      name: "Some"
+                    }
+                    ty: Type {
+                      id: TypeId(1)
+                      kind: TypeKind::Concrete(TypeConcrete {
+                          name: Path {
+                            segments: [
+                              Ident {
+                                id: IdentId(4)
                                 name: "T"
-                            bounds: []
-                        ]
-                        variants: [
-                            name:
-                                id: 3
-                                name: "Some"
-                            ty:
-                                id: 1
-                                kind:
-                                    Concrete:
-                                        name:
-                                            segments: [
-                                                id: 4
-                                                name: "T"
-                                            ]
-                                        generics: [],
-                            name:
-                                id: 5
-                                name: "None"
-                            ty:
-                                id: 2
-                                kind:
-                                    Primitive: "Unit"
-                        ],
-    id: 2
-    kind:
-        Let:
-            binding:
-                id: 6
-                name: "Pair"
-            ty: null
-            value:
-                id: 2
-                kind:
-                    Struct:
-                        params: [
-                            name:
-                                id: 7
+                              }
+                            ]
+                          }
+                          generics: [
+                          ]
+                        }
+                      )
+                    }
+                  }
+                  Field {
+                    name: Ident {
+                      id: IdentId(5)
+                      name: "None"
+                    }
+                    ty: Type {
+                      id: TypeId(2)
+                      kind: TypeKind::Primitive(TypePrimitive::Unit)
+                    }
+                  }
+                ]
+              }
+            )
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(2)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(6)
+          name: "Pair"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(2)
+            kind: ExprKind::Struct(ExprStruct {
+                params: [
+                  TypeParam {
+                    name: Ident {
+                      id: IdentId(7)
+                      name: "T"
+                    }
+                    bounds: (
+                    )
+                  }
+                  TypeParam {
+                    name: Ident {
+                      id: IdentId(8)
+                      name: "U"
+                    }
+                    bounds: (
+                    )
+                  }
+                ]
+                fields: [
+                  Field {
+                    name: Ident {
+                      id: IdentId(9)
+                      name: "first"
+                    }
+                    ty: Type {
+                      id: TypeId(3)
+                      kind: TypeKind::Concrete(TypeConcrete {
+                          name: Path {
+                            segments: [
+                              Ident {
+                                id: IdentId(10)
                                 name: "T"
-                            bounds: [],
-                            name:
-                                id: 8
+                              }
+                            ]
+                          }
+                          generics: [
+                          ]
+                        }
+                      )
+                    }
+                  }
+                  Field {
+                    name: Ident {
+                      id: IdentId(11)
+                      name: "second"
+                    }
+                    ty: Type {
+                      id: TypeId(4)
+                      kind: TypeKind::Concrete(TypeConcrete {
+                          name: Path {
+                            segments: [
+                              Ident {
+                                id: IdentId(12)
                                 name: "U"
-                            bounds: []
-                        ]
-                        fields: [
-                            name:
-                                id: 9
-                                name: "first"
-                            ty:
-                                id: 3
-                                kind:
-                                    Concrete:
-                                        name:
-                                            segments: [
-                                                id: 10
-                                                name: "T"
-                                            ]
-                                        generics: [],
-                            name:
-                                id: 11
-                                name: "second"
-                            ty:
-                                id: 4
-                                kind:
-                                    Concrete:
-                                        name:
-                                            segments: [
-                                                id: 12
-                                                name: "U"
-                                            ]
-                                        generics: []
-                        ],
-    id: 3
-    kind:
-        Let:
-            binding:
-                id: 13
-                name: "Tag"
-            ty: null
-            value:
-                id: 3
-                kind:
-                    Enum:
-                        variants: [
-                            id: 14
-                            name: "Some",
-                            id: 15
-                            name: "None"
-                        ]
+                              }
+                            ]
+                          }
+                          generics: [
+                          ]
+                        }
+                      )
+                    }
+                  }
+                ]
+              }
+            )
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(3)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(13)
+          name: "Tag"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(3)
+            kind: ExprKind::Enum(ExprEnum {
+                variants: [
+                  Ident {
+                    id: IdentId(14)
+                    name: "Some"
+                  }
+                  Ident {
+                    id: IdentId(15)
+                    name: "None"
+                  }
+                ]
+              }
+            )
+          }
+        )
+      }
+    )
+  }
 ]

@@ -1,0 +1,162 @@
+[
+  Item {
+    id: ItemId(1)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(1)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(1)
+            kind: ExprKind::FloatLiteral(1e30)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(2)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(2)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(2)
+            kind: ExprKind::FloatLiteral(1e30)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(3)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(3)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(3)
+            kind: ExprKind::FloatLiteral(1e-30)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(4)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(4)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(4)
+            kind: ExprKind::FloatLiteral(1.42e30)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(5)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(5)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(5)
+            kind: ExprKind::FloatLiteral(-1.42e-30)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(6)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(6)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(6)
+            kind: ExprKind::FloatLiteral(1.42)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(7)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(7)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(7)
+            kind: ExprKind::IntLiteral(142)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(8)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(8)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(8)
+            kind: ExprKind::IntLiteral(5295)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(9)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(9)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(9)
+            kind: ExprKind::IntLiteral(237)
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(10)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(10)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(10)
+            kind: ExprKind::IntLiteral(49915)
+          }
+        )
+      }
+    )
+  }
+]

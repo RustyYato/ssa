@@ -1,67 +1,103 @@
 [
-    id: 4
-    kind:
-        If:
-            blocks: [
-                cond:
-                    id: 1
-                    kind:
-                        Ident:
-                            id: 1
-                            name: "x"
-                block:
-                    items: [
-                        id: 1
-                        kind:
-                            Let:
-                                binding:
-                                    id: 2
-                                    name: "a"
-                                ty: null
-                                value:
-                                    id: 2
-                                    kind:
-                                        Ident:
-                                            id: 3
-                                            name: "d"
-                    ],
-                cond:
-                    id: 3
-                    kind:
-                        Ident:
-                            id: 4
-                            name: "y"
-                block:
-                    items: [
-                        id: 2
-                        kind:
-                            Let:
-                                binding:
-                                    id: 5
-                                    name: "b"
-                                ty: null
-                                value:
-                                    id: 4
-                                    kind:
-                                        Ident:
-                                            id: 6
-                                            name: "e"
-                    ]
+  Item {
+    id: ItemId(4)
+    kind: ItemKind::If(ItemIf {
+        blocks: [
+          ConditionalItemBlock {
+            cond: Expr {
+              id: ExprId(1)
+              kind: ExprKind::Ident(Ident {
+                  id: IdentId(1)
+                  name: "x"
+                }
+              )
+            }
+            block: ItemBlock {
+              items: [
+                Item {
+                  id: ItemId(1)
+                  kind: ItemKind::Let(Let {
+                      binding: Ident {
+                        id: IdentId(2)
+                        name: "a"
+                      }
+                      ty: 
+                      value: Option::Some(Expr {
+                          id: ExprId(2)
+                          kind: ExprKind::Ident(Ident {
+                              id: IdentId(3)
+                              name: "d"
+                            }
+                          )
+                        }
+                      )
+                    }
+                  )
+                }
+              ]
+            }
+          }
+          ConditionalItemBlock {
+            cond: Expr {
+              id: ExprId(3)
+              kind: ExprKind::Ident(Ident {
+                  id: IdentId(4)
+                  name: "y"
+                }
+              )
+            }
+            block: ItemBlock {
+              items: [
+                Item {
+                  id: ItemId(2)
+                  kind: ItemKind::Let(Let {
+                      binding: Ident {
+                        id: IdentId(5)
+                        name: "b"
+                      }
+                      ty: 
+                      value: Option::Some(Expr {
+                          id: ExprId(4)
+                          kind: ExprKind::Ident(Ident {
+                              id: IdentId(6)
+                              name: "e"
+                            }
+                          )
+                        }
+                      )
+                    }
+                  )
+                }
+              ]
+            }
+          }
+        ]
+        default: Option::Some(ItemBlock {
+            items: [
+              Item {
+                id: ItemId(3)
+                kind: ItemKind::Let(Let {
+                    binding: Ident {
+                      id: IdentId(7)
+                      name: "c"
+                    }
+                    ty: 
+                    value: Option::Some(Expr {
+                        id: ExprId(5)
+                        kind: ExprKind::Ident(Ident {
+                            id: IdentId(8)
+                            name: "f"
+                          }
+                        )
+                      }
+                    )
+                  }
+                )
+              }
             ]
-            default:
-                items: [
-                    id: 3
-                    kind:
-                        Let:
-                            binding:
-                                id: 7
-                                name: "c"
-                            ty: null
-                            value:
-                                id: 5
-                                kind:
-                                    Ident:
-                                        id: 8
-                                        name: "f"
-                ]
+          }
+        )
+      }
+    )
+  }
 ]

@@ -1,61 +1,92 @@
 [
-    id: 1
-    kind:
-        Let:
-            binding:
-                id: 1
-                name: "with_expr"
-            ty: null
-            value:
-                id: 3
-                kind:
-                    Block:
-                        stmts: [
-                            id: 1
-                            kind:
-                                Let:
-                                    binding:
-                                        id: 2
-                                        name: "y"
-                                    ty: null
-                                    value:
-                                        id: 1
-                                        kind:
-                                            Ident:
-                                                id: 3
-                                                name: "x"
-                        ]
-                        expr:
-                            id: 2
-                            kind:
-                                Ident:
-                                    id: 4
-                                    name: "x",
-    id: 2
-    kind:
-        Let:
-            binding:
-                id: 5
-                name: "no_expr"
-            ty: null
-            value:
-                id: 5
-                kind:
-                    Block:
-                        stmts: [
-                            id: 3
-                            kind:
-                                Let:
-                                    binding:
-                                        id: 6
-                                        name: "y"
-                                    ty: null
-                                    value:
-                                        id: 4
-                                        kind:
-                                            Ident:
-                                                id: 7
-                                                name: "x"
-                        ]
-                        expr: null
+  Item {
+    id: ItemId(1)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(1)
+          name: "with_expr"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(3)
+            kind: ExprKind::Block(Block {
+                stmts: [
+                  Stmt {
+                    id: StmtId(1)
+                    kind: StmtKind::Let(Let {
+                        binding: Ident {
+                          id: IdentId(2)
+                          name: "y"
+                        }
+                        ty: 
+                        value: Option::Some(Expr {
+                            id: ExprId(1)
+                            kind: ExprKind::Ident(Ident {
+                                id: IdentId(3)
+                                name: "x"
+                              }
+                            )
+                          }
+                        )
+                      }
+                    )
+                  }
+                ]
+                expr: Option::Some(Expr {
+                    id: ExprId(2)
+                    kind: ExprKind::Ident(Ident {
+                        id: IdentId(4)
+                        name: "x"
+                      }
+                    )
+                  }
+                )
+              }
+            )
+          }
+        )
+      }
+    )
+  }
+  Item {
+    id: ItemId(2)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(5)
+          name: "no_expr"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(5)
+            kind: ExprKind::Block(Block {
+                stmts: [
+                  Stmt {
+                    id: StmtId(3)
+                    kind: StmtKind::Let(Let {
+                        binding: Ident {
+                          id: IdentId(6)
+                          name: "y"
+                        }
+                        ty: 
+                        value: Option::Some(Expr {
+                            id: ExprId(4)
+                            kind: ExprKind::Ident(Ident {
+                                id: IdentId(7)
+                                name: "x"
+                              }
+                            )
+                          }
+                        )
+                      }
+                    )
+                  }
+                ]
+                expr: 
+              }
+            )
+          }
+        )
+      }
+    )
+  }
 ]

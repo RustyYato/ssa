@@ -1,71 +1,108 @@
 [
-    id: 1
-    kind:
-        Let:
-            binding:
-                id: 1
-                name: "x"
-            ty:
-                id: 10
-                kind:
-                    Tuple: [
-                        id: 1
-                        kind:
-                            Primitive: "Addr",
-                        id: 2
-                        kind:
-                            Primitive:
-                                UInt:
-                                    bits: 32,
-                        id: 3
-                        kind:
-                            Primitive:
-                                SInt:
-                                    bits: 32,
-                        id: 4
-                        kind:
-                            Primitive: "Float32",
-                        id: 5
-                        kind:
-                            Primitive: "Float64",
-                        id: 6
-                        kind:
-                            Primitive:
-                                SInt:
-                                    bits: 43,
-                        id: 7
-                        kind:
-                            Primitive:
-                                UInt:
-                                    bits: 52,
-                        id: 9
-                        kind:
-                            Concrete:
-                                name:
-                                    segments: [
-                                        id: 2
-                                        name: "std",
-                                        id: 3
-                                        name: "option",
-                                        id: 4
-                                        name: "Option"
-                                    ]
-                                generics: [
-                                    id: 8
-                                    kind:
-                                        Concrete:
-                                            name:
-                                                segments: [
-                                                    id: 5
-                                                    name: "T"
-                                                ]
-                                            generics: []
+  Item {
+    id: ItemId(1)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(1)
+          name: "x"
+        }
+        ty: Option::Some(Type {
+            id: TypeId(10)
+            kind: TypeKind::Tuple([
+                Type {
+                  id: TypeId(1)
+                  kind: TypeKind::Primitive(TypePrimitive::Addr)
+                }
+                Type {
+                  id: TypeId(2)
+                  kind: TypeKind::Primitive(TypePrimitive::UInt {
+                      bits: 32
+                    }
+                  )
+                }
+                Type {
+                  id: TypeId(3)
+                  kind: TypeKind::Primitive(TypePrimitive::SInt {
+                      bits: 32
+                    }
+                  )
+                }
+                Type {
+                  id: TypeId(4)
+                  kind: TypeKind::Primitive(TypePrimitive::Float32)
+                }
+                Type {
+                  id: TypeId(5)
+                  kind: TypeKind::Primitive(TypePrimitive::Float64)
+                }
+                Type {
+                  id: TypeId(6)
+                  kind: TypeKind::Primitive(TypePrimitive::SInt {
+                      bits: 43
+                    }
+                  )
+                }
+                Type {
+                  id: TypeId(7)
+                  kind: TypeKind::Primitive(TypePrimitive::UInt {
+                      bits: 52
+                    }
+                  )
+                }
+                Type {
+                  id: TypeId(9)
+                  kind: TypeKind::Concrete(TypeConcrete {
+                      name: Path {
+                        segments: [
+                          Ident {
+                            id: IdentId(2)
+                            name: "std"
+                          }
+                          Ident {
+                            id: IdentId(3)
+                            name: "option"
+                          }
+                          Ident {
+                            id: IdentId(4)
+                            name: "Option"
+                          }
+                        ]
+                      }
+                      generics: [
+                        Type {
+                          id: TypeId(8)
+                          kind: TypeKind::Concrete(TypeConcrete {
+                              name: Path {
+                                segments: [
+                                  Ident {
+                                    id: IdentId(5)
+                                    name: "T"
+                                  }
                                 ]
-                    ]
-            value:
-                id: 1
-                kind:
-                    Ident:
-                        id: 6
-                        name: "x"
+                              }
+                              generics: [
+                              ]
+                            }
+                          )
+                        }
+                      ]
+                    }
+                  )
+                }
+              ]
+            )
+          }
+        )
+        value: Option::Some(Expr {
+            id: ExprId(1)
+            kind: ExprKind::Ident(Ident {
+                id: IdentId(6)
+                name: "x"
+              }
+            )
+          }
+        )
+      }
+    )
+  }
 ]

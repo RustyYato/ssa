@@ -884,7 +884,7 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
             }
             TokenKind::HexIntegerLiteral => {
                 let peek = self.lexer.peek;
-                let token = self.debug_expect(TokenKind::DecimalIntegerLiteral);
+                let token = self.debug_expect(TokenKind::HexIntegerLiteral);
                 let lexeme: &[u8] = token.lexeme.as_ref();
                 let lexeme = unsafe { core::str::from_utf8_unchecked(&lexeme[2..]) };
 
@@ -898,7 +898,7 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
             }
             TokenKind::OctalIntegerLiteral => {
                 let peek = self.lexer.peek;
-                let token = self.debug_expect(TokenKind::DecimalIntegerLiteral);
+                let token = self.debug_expect(TokenKind::OctalIntegerLiteral);
                 let lexeme: &[u8] = token.lexeme.as_ref();
                 let lexeme = unsafe { core::str::from_utf8_unchecked(&lexeme[2..]) };
 
@@ -912,7 +912,7 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
             }
             TokenKind::BinaryIntegerLiteral => {
                 let peek = self.lexer.peek;
-                let token = self.debug_expect(TokenKind::DecimalIntegerLiteral);
+                let token = self.debug_expect(TokenKind::BinaryIntegerLiteral);
                 let lexeme: &[u8] = token.lexeme.as_ref();
                 let lexeme = unsafe { core::str::from_utf8_unchecked(&lexeme[2..]) };
 

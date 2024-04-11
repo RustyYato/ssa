@@ -1,15 +1,22 @@
 [
-    id: 1
-    kind:
-        Let:
-            binding:
-                id: 1
+  Item {
+    id: ItemId(1)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(1)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(1)
+            kind: ExprKind::Ident(Ident {
+                id: IdentId(2)
                 name: "x"
-            ty: null
-            value:
-                id: 1
-                kind:
-                    Ident:
-                        id: 2
-                        name: "x"
+              }
+            )
+          }
+        )
+      }
+    )
+  }
 ]

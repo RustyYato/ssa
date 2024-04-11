@@ -1,31 +1,46 @@
 [
-    id: 1
-    kind:
-        Let:
-            binding:
-                id: 1
-                name: "x"
-            ty: null
-            value:
-                id: 4
-                kind:
-                    Call:
-                        func:
-                            id: 1
-                            kind:
-                                Ident:
-                                    id: 2
-                                    name: "x"
-                        args: [
-                            id: 2
-                            kind:
-                                Ident:
-                                    id: 3
-                                    name: "x",
-                            id: 3
-                            kind:
-                                Ident:
-                                    id: 4
-                                    name: "x"
-                        ]
+  Item {
+    id: ItemId(1)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(1)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(4)
+            kind: ExprKind::Call(ExprCall {
+                func: Expr {
+                  id: ExprId(1)
+                  kind: ExprKind::Ident(Ident {
+                      id: IdentId(2)
+                      name: "x"
+                    }
+                  )
+                }
+                args: [
+                  Expr {
+                    id: ExprId(2)
+                    kind: ExprKind::Ident(Ident {
+                        id: IdentId(3)
+                        name: "x"
+                      }
+                    )
+                  }
+                  Expr {
+                    id: ExprId(3)
+                    kind: ExprKind::Ident(Ident {
+                        id: IdentId(4)
+                        name: "x"
+                      }
+                    )
+                  }
+                ]
+              }
+            )
+          }
+        )
+      }
+    )
+  }
 ]

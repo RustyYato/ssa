@@ -4,3 +4,7 @@ let x = 1E-30;
 let x = 1.42E+30;
 let x = -1.42e-30;
 let x = 1.42;
+let x = 142;
+let x = 0x14af;
+let x = 0b011101101;
+let x = 0o141373;

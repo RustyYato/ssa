@@ -1,32 +1,48 @@
 [
-    id: 1
-    kind:
-        Let:
-            binding:
-                id: 1
-                name: "x"
-            ty: null
-            value:
-                id: 5
-                kind:
-                    Loop:
-                        block:
-                            stmts: [
-                                id: 1
-                                kind:
-                                    Expr:
-                                        id: 4
-                                        kind:
-                                            Break:
-                                                id: 3
-                                                kind:
-                                                    Continue:
-                                                        id: 2
-                                                        kind:
-                                                            Return:
-                                                                id: 1
-                                                                kind:
-                                                                    Break: null
-                            ]
-                            expr: null
+  Item {
+    id: ItemId(1)
+    kind: ItemKind::Let(Let {
+        binding: Ident {
+          id: IdentId(1)
+          name: "x"
+        }
+        ty: 
+        value: Option::Some(Expr {
+            id: ExprId(5)
+            kind: ExprKind::Loop(Loop {
+                block: Block {
+                  stmts: [
+                    Stmt {
+                      id: StmtId(1)
+                      kind: StmtKind::Expr(Expr {
+                          id: ExprId(4)
+                          kind: ExprKind::Break(Option::Some(Expr {
+                                id: ExprId(3)
+                                kind: ExprKind::Continue(Option::Some(Expr {
+                                      id: ExprId(2)
+                                      kind: ExprKind::Return(Option::Some(Expr {
+                                            id: ExprId(1)
+                                            kind: ExprKind::Break()
+                                          }
+                                        )
+                                      )
+                                    }
+                                  )
+                                )
+                              }
+                            )
+                          )
+                        }
+                      )
+                    }
+                  ]
+                  expr: 
+                }
+              }
+            )
+          }
+        )
+      }
+    )
+  }
 ]
