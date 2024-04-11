@@ -228,7 +228,7 @@ pub struct IdCtx {
 macro_rules! make_id {
     ($name:ident $field:ident $func:ident) => {
         #[repr(transparent)]
-        #[derive(Debug, serde::Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        #[derive(Debug, serde::Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $name(NonZeroU32);
 
         impl $name {

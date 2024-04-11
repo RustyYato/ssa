@@ -1,5 +1,6 @@
 use crate::ast;
 
+mod name_resolution;
 mod validate_type_def;
 
 pub trait ValidationErrorReporter<'ast> {
@@ -14,5 +15,5 @@ pub fn validate<'ast>(
     file: &'ast [ast::Item<'ast>],
     errors: &mut dyn ValidationErrorReporter<'ast>,
 ) {
-    validate_type_def::validate_type_defs(file, errors)
+    validate_type_def::validate_type_defs(file, errors);
 }
