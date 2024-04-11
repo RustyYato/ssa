@@ -104,4 +104,8 @@ impl<'text> ssa::parser::ParseError<'text> for TestError {
             "unsupported number of btis for float {bits} {found:#?}"
         ))
     }
+
+    fn expected(&mut self, token: ssa::parser::TokenKind, found: &[ssa::parser::Token<'text>]) {
+        self.errors.push(format!("expected {token:?} {found:#?}"))
+    }
 }
