@@ -17,6 +17,7 @@ yoke = { version = "0.7", features = ["derive"] }
 stable_deref_trait = { version = "1" }
 linkme = "0.3.25"
 serde = { version = "1", features = ["derive"] }
+rustc-hash = "1"
 
 [workspace.dependencies.smallvec]
 version = "1"

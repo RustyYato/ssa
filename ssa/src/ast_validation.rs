@@ -3,6 +3,8 @@ use crate::ast;
 mod name_resolution;
 mod validate_type_def;
 
+pub use name_resolution::resolve_names;
+
 pub trait ValidationErrorReporter<'ast> {
     fn set_error(&mut self) {}
 

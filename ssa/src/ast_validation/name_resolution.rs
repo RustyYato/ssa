@@ -6,35 +6,46 @@ struct CollectGlobals {
     names: istr::IStrMap<ast::IdentId>,
 }
 
-struct GlobalNameResolver {
-    names: istr::IStrMap<ast::IdentId>,
-
-    id_map: HashMap<ast::IdentId, ast::IdentId>,
-}
-
-struct NameResolver<'a> {
-    globals: &'a mut GlobalNameResolver,
+struct NameResolver {
+    globals: istr::IStrMap<ast::IdentId>,
 
     names_map: istr::IStrMap<Vec<ast::IdentId>>,
     names_stack: Vec<istr::IStr>,
+
+    id_map: rustc_hash::FxHashMap<ast::IdentId, ast::IdentId>,
 }
 
-pub fn resolve_names(items: &[ast::Item<'_>]) -> HashMap<ast::IdentId, ast::IdentId> {
+pub struct Resolution {
+    id_map: rustc_hash::FxHashMap<ast::IdentId, ast::IdentId>,
+}
+
+impl Resolution {
+    pub fn get(&self, id: ast::IdentId) -> Option<ast::IdentId> {
+        self.id_map.get(&id).copied()
+    }
+}
+
+pub fn resolve_names(items: &[ast::Item<'_>]) -> Resolution {
     let mut globals = CollectGlobals {
         names: HashMap::default(),
     };
 
     items.visit(&mut globals);
 
-    let mut globals = GlobalNameResolver {
-        names: globals.names,
+    let mut globals = NameResolver {
+        globals: globals.names,
 
-        id_map: HashMap::new(),
+        names_map: istr::IStrMap::default(),
+        names_stack: Vec::new(),
+
+        id_map: HashMap::default(),
     };
 
     items.visit(&mut globals);
 
-    globals.id_map
+    Resolution {
+        id_map: globals.id_map,
+    }
 }
 
 impl<'ast> ast::Visitor<'ast> for CollectGlobals {
@@ -49,17 +60,11 @@ impl<'ast> ast::Visitor<'ast> for CollectGlobals {
     }
 }
 
-impl<'ast> ast::Visitor<'ast> for GlobalNameResolver {
+impl<'ast> ast::Visitor<'ast> for NameResolver {
     fn visit_item_let(&mut self, _id: ast::ItemId, stmt_let: &'ast ast::Let<'ast>) {
-        stmt_let.value.visit(&mut NameResolver {
-            globals: self,
-            names_map: istr::IStrMap::default(),
-            names_stack: Vec::new(),
-        });
+        stmt_let.value.visit(self);
     }
-}
 
-impl<'ast> ast::Visitor<'ast> for NameResolver<'_> {
     fn visit_let(&mut self, item_let: &'ast ast::Let<'ast>) {
         item_let.value.visit(self);
 
@@ -71,16 +76,15 @@ impl<'ast> ast::Visitor<'ast> for NameResolver<'_> {
     }
 
     fn visit_expr_ident(&mut self, _id: ast::ExprId, expr_ident: &'ast ast::Ident) {
-        dbg!(expr_ident.id, &self.names_map);
         match self
             .names_map
             .get(&expr_ident.name)
             .and_then(|stack| stack.last())
             .copied()
-            .or_else(|| self.globals.names.get(&expr_ident.name).copied())
+            .or_else(|| self.globals.get(&expr_ident.name).copied())
         {
             Some(source) => {
-                self.globals.id_map.insert(expr_ident.id, source);
+                self.id_map.insert(expr_ident.id, source);
             }
             None => {
                 panic!("unresolved {}", expr_ident.name)

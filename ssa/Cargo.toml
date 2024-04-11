@@ -16,6 +16,7 @@ smallvec.workspace = true
 logos.workspace = true
 serde.workspace = true
 bstr.workspace = true
+rustc-hash.workspace = true
 
 [dev-dependencies]
 test-harness.workspace = true
