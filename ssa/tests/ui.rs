@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 
-use ssa::parser::{HadErrors, ParseError};
+use ssa::parser::ParseError;
 
 fn main() -> ! {
     test_harness::main()
