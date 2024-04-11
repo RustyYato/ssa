@@ -1,0 +1,40 @@
+zero bits signed integer [
+    Token {
+        kind: Ident(
+            "i0",
+        ),
+        lexeme: "i0",
+        line_start: 0,
+        col_start: 8,
+        line_end: 0,
+        col_end: 10,
+    },
+    Token {
+        kind: Semicolon,
+        lexeme: ";",
+        line_start: 0,
+        col_start: 10,
+        line_end: 0,
+        col_end: 11,
+    },
+]
+zero bits unsigned integer [
+    Token {
+        kind: Ident(
+            "u0",
+        ),
+        lexeme: "u0",
+        line_start: 1,
+        col_start: 8,
+        line_end: 1,
+        col_end: 10,
+    },
+    Token {
+        kind: Semicolon,
+        lexeme: ";",
+        line_start: 1,
+        col_start: 10,
+        line_end: 1,
+        col_end: 11,
+    },
+]

@@ -1,11 +1,11 @@
-use std::num::NonZeroU16;
+use std::{hash::Hash, num::NonZeroU16};
 
 use crate::{ast, pool::Pool};
 
 #[derive(logos::Logos, Debug, Clone, Copy, PartialEq, Eq)]
 #[logos(source = [u8])]
 #[logos(error = LexerError)]
-enum TokenKind<'s> {
+pub enum TokenKind<'s> {
     Eof,
 
     // erroneous unicode characters
@@ -134,8 +134,162 @@ enum TokenKind<'s> {
     Enum,
 }
 
+pub trait ParseError<'text> {
+    fn expected_item(&mut self, found: &[Token<'text>]);
+
+    fn expected_ident(&mut self, found: &[Token<'text>]);
+
+    fn expected_expr(&mut self, found: &[Token<'text>]);
+
+    fn expected_type(&mut self, found: &[Token<'text>]);
+
+    fn too_many_bits(&mut self, ty: char, bits: &str, tokens: &[Token<'text>]);
+
+    fn zero_bit_integer(&mut self, is_signed: bool, tokens: &[Token<'text>]);
+
+    fn unsupported_float_bits(&mut self, bits: u16, tokens: &[Token<'text>]);
+
+    fn had_errors(self) -> HadErrors<Self>
+    where
+        Self: Sized,
+    {
+        HadErrors {
+            had_errors: false,
+            errors: self,
+        }
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct HadErrors<T = ()> {
+    pub had_errors: bool,
+    pub errors: T,
+}
+
+impl HadErrors {
+    pub const fn new() -> Self {
+        Self {
+            had_errors: false,
+            errors: (),
+        }
+    }
+}
+
+#[allow(unused)]
+impl<'text> ParseError<'text> for HadErrors {
+    fn expected_item(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+
+    fn expected_ident(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+
+    fn expected_expr(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+
+    fn expected_type(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+
+    fn too_many_bits(&mut self, ty: char, bits: &str, tokens: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+
+    fn zero_bit_integer(&mut self, is_signed: bool, tokens: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+
+    fn unsupported_float_bits(&mut self, bits: u16, tokens: &[Token<'text>]) {
+        self.had_errors = true;
+    }
+}
+
+impl<'text, T: ParseError<'text>> ParseError<'text> for HadErrors<T> {
+    fn expected_item(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.expected_item(found)
+    }
+
+    fn expected_ident(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.expected_ident(found)
+    }
+
+    fn expected_expr(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.expected_expr(found)
+    }
+
+    fn expected_type(&mut self, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.expected_type(found)
+    }
+
+    fn too_many_bits(&mut self, ty: char, bits: &str, found: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.too_many_bits(ty, bits, found)
+    }
+
+    fn zero_bit_integer(&mut self, is_signed: bool, tokens: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.zero_bit_integer(is_signed, tokens)
+    }
+
+    fn unsupported_float_bits(&mut self, bits: u16, tokens: &[Token<'text>]) {
+        self.had_errors = true;
+        self.errors.unsupported_float_bits(bits, tokens)
+    }
+}
+
+pub struct PanicDebugParseError;
+
+impl<'text> ParseError<'text> for PanicDebugParseError {
+    fn expected_item(&mut self, found: &[Token<'text>]) {
+        panic!("Expected an item, but found {:#?}", found[0])
+    }
+
+    fn expected_ident(&mut self, found: &[Token<'text>]) {
+        panic!("Expected an ident, but found {:#?}", found[0])
+    }
+
+    fn expected_expr(&mut self, found: &[Token<'text>]) {
+        panic!("Expected an expr, but found {:#?}", found[0])
+    }
+
+    fn expected_type(&mut self, found: &[Token<'text>]) {
+        panic!("Expected a type, but found {:#?}", found[0])
+    }
+
+    fn too_many_bits(&mut self, ty: char, bits: &str, _found: &[Token<'text>]) {
+        let ty = match ty {
+            'i' => "signed integer",
+            'u' => "unsigned integer",
+            'f' => "float",
+            _ => unreachable!(),
+        };
+        panic!(
+            "Tried to specify {bits} > {} bits for a {ty}, which is not supported",
+            u16::MAX
+        )
+    }
+
+    fn zero_bit_integer(&mut self, is_signed: bool, _tokens: &[Token<'text>]) {
+        panic!(
+            "Zero bit {}signed integers are unsupported",
+            if is_signed { "" } else { "un" }
+        )
+    }
+
+    fn unsupported_float_bits(&mut self, bits: u16, _tokens: &[Token<'text>]) {
+        panic!("{} bit floats are unsupported", bits)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LexerError {}
+pub enum LexerError {}
 
 impl Default for LexerError {
     fn default() -> Self {
@@ -160,18 +314,21 @@ struct PeekingLexer<'text, const N: usize> {
     lexer: Lexer<'text>,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy)]
-struct Token<'text> {
-    kind: TokenKind<'text>,
-    lexeme: &'text bstr::BStr,
-    line_start: u32,
-    col_start: u32,
-    line_end: u32,
-    col_end: u32,
+pub struct Token<'text> {
+    pub kind: TokenKind<'text>,
+    pub lexeme: &'text bstr::BStr,
+    pub line_start: u32,
+    pub col_start: u32,
+    pub line_end: u32,
+    pub col_end: u32,
 }
 
-pub struct Parser<'ast, 'text> {
+pub struct Parser<'ast, 'text, 'a> {
     lexer: PeekingLexer<'text, 2>,
+
+    errors: &'a mut dyn ParseError<'text>,
 
     ctx: &'ast AstContext,
     pool: ObjectPools<'ast>,
@@ -313,10 +470,16 @@ impl<'text, const N: usize> PeekingLexer<'text, N> {
     }
 }
 
-impl<'ast, 'text> Parser<'ast, 'text> {
-    pub fn new(ctx: &'ast AstContext, pool: ObjectPools<'ast>, text: &'text [u8]) -> Self {
+impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
+    pub fn new(
+        ctx: &'ast AstContext,
+        pool: ObjectPools<'ast>,
+        errors: &'env mut dyn ParseError<'text>,
+        text: &'text [u8],
+    ) -> Self {
         Self {
             ctx,
+            errors,
             lexer: PeekingLexer::new(text),
             id_ctx: ast::IdCtx::default(),
             pool,
@@ -327,9 +490,10 @@ impl<'ast, 'text> Parser<'ast, 'text> {
         self.pool.clear()
     }
 
-    pub fn clear_text<'a>(self) -> Parser<'ast, 'a> {
+    pub fn clear_text<'a, 'e>(self, errors: &'e mut dyn ParseError<'a>) -> Parser<'ast, 'a, 'e> {
         Parser {
             ctx: self.ctx,
+            errors,
             lexer: PeekingLexer::new(b""),
             id_ctx: ast::IdCtx::default(),
             pool: self.pool,
@@ -392,7 +556,10 @@ impl<'ast, 'text> Parser<'ast, 'text> {
                 self.expect(TokenKind::Semicolon);
                 item
             }
-            _ => unreachable!(),
+            _ => {
+                self.errors.expected_item(&self.lexer.peek);
+                ast::ItemKind::Error
+            }
         };
 
         ast::Item {
@@ -428,7 +595,13 @@ impl<'ast, 'text> Parser<'ast, 'text> {
                 id: self.id_ctx.ident_id(),
                 name: istr::IStr::new("addr"),
             },
-            _ => unreachable!(),
+            _ => {
+                self.errors.expected_ident(&self.lexer.peek);
+                ast::Ident {
+                    id: self.id_ctx.ident_id(),
+                    name: istr::IStr::empty(),
+                }
+            }
         }
     }
 
@@ -636,7 +809,8 @@ impl<'ast, 'text> Parser<'ast, 'text> {
             }
             _ => {
                 debug_assert!(!self.is_expr_start());
-                unreachable!()
+                self.errors.expected_expr(&self.lexer.peek);
+                ast::ExprKind::Error
             }
         };
 
@@ -836,15 +1010,31 @@ impl<'ast, 'text> Parser<'ast, 'text> {
                 if ident.starts_with(['i', 'u', 'f'])
                     && ident[1..].as_bytes().iter().all(|x| x.is_ascii_digit())
                 {
-                    self.lexer.next_token();
                     let bits = match ident[1..].parse::<u16>() {
                         Ok(x) => x,
-                        Err(_) => unreachable!(),
+                        Err(_) => {
+                            self.errors.too_many_bits(
+                                ident.as_bytes()[0] as char,
+                                &ident[1..],
+                                &self.lexer.peek,
+                            );
+                            1
+                        }
                     };
 
                     let kind = match (ident.as_bytes()[0], bits) {
-                        (b'i', 0) => unreachable!(),
-                        (b'u', 0) => unreachable!(),
+                        (b'i', 0) => {
+                            self.errors.zero_bit_integer(true, &self.lexer.peek);
+                            ast::TypePrimitive::SInt {
+                                bits: NonZeroU16::new(1).unwrap(),
+                            }
+                        }
+                        (b'u', 0) => {
+                            self.errors.zero_bit_integer(false, &self.lexer.peek);
+                            ast::TypePrimitive::UInt {
+                                bits: NonZeroU16::new(1).unwrap(),
+                            }
+                        }
                         (b'f', 32) => ast::TypePrimitive::Float32,
                         (b'f', 64) => ast::TypePrimitive::Float64,
                         (b'i', bits) => {
@@ -855,9 +1045,13 @@ impl<'ast, 'text> Parser<'ast, 'text> {
                             let bits = NonZeroU16::new(bits).unwrap();
                             ast::TypePrimitive::UInt { bits }
                         }
-                        (b'f', _) => unreachable!(),
+                        (b'f', _) => {
+                            self.errors.unsupported_float_bits(bits, &self.lexer.peek);
+                            ast::TypePrimitive::Float32
+                        }
                         _ => unreachable!(),
                     };
+                    self.lexer.next_token();
 
                     ast::TypeKind::Primitive(kind)
                 } else if ident == "byte" {
@@ -887,7 +1081,10 @@ impl<'ast, 'text> Parser<'ast, 'text> {
                 self.lexer.next_token();
                 ast::TypeKind::Primitive(ast::TypePrimitive::Addr)
             }
-            _ => unreachable!(),
+            _ => {
+                self.errors.expected_type(&self.lexer.peek);
+                ast::TypeKind::Primitive(ast::TypePrimitive::Void)
+            }
         };
 
         ast::Type {

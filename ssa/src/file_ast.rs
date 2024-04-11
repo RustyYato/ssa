@@ -45,9 +45,13 @@ pub fn parse(text: &[u8]) -> File {
 }
 
 pub fn parse_with<'ast>(ctx: &'ast parser::AstContext, text: &[u8]) -> FileRef<'ast> {
-    let mut parser = parser::Parser::new(ctx, parser::ObjectPools::default(), text);
+    let items = parser::Parser::new(
+        ctx,
+        parser::ObjectPools::default(),
+        &mut crate::parser::PanicDebugParseError,
+        text,
+    )
+    .parse_file();
 
-    FileRef {
-        items: parser.parse_file(),
-    }
+    FileRef { items }
 }

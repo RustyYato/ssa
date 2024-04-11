@@ -310,6 +310,7 @@ pub struct Item<'ast> {
 pub enum ItemKind<'ast> {
     If(&'ast ItemIf<'ast>),
     Let(&'ast Let<'ast>),
+    Error,
 }
 
 impl<'ast> Visit<'ast> for Item<'ast> {
@@ -322,6 +323,7 @@ impl<'ast> Visit<'ast> for Item<'ast> {
         match kind {
             ItemKind::If(item) => item.visit(v),
             ItemKind::Let(item) => v.visit_item_let(id, item),
+            ItemKind::Error => (),
         }
     }
 }
@@ -399,6 +401,8 @@ pub enum ExprKind<'ast> {
     Struct(&'ast ExprStruct<'ast>),
     Union(&'ast ExprUnion<'ast>),
     Enum(&'ast ExprEnum<'ast>),
+
+    Error,
 }
 
 impl<'ast> Visit<'ast> for Expr<'ast> {
@@ -424,6 +428,7 @@ impl<'ast> Visit<'ast> for Expr<'ast> {
             ExprKind::Struct(expr) => expr.visit(v),
             ExprKind::Union(expr) => expr.visit(v),
             ExprKind::Enum(expr) => expr.visit(v),
+            ExprKind::Error => (),
         }
     }
 }
