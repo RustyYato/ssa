@@ -559,6 +559,8 @@ impl<'ast, 'text, 'env> Parser<'ast, 'text, 'env> {
 
         self.pool.item.free(items);
 
+        self.expect(TokenKind::Eof);
+
         file
     }
 

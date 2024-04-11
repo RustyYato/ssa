@@ -19,6 +19,7 @@ members = ["."]
 
 [profile.release]
 debug = 1
+debug-assertions = true
 
 [[bin]]
 name = "fuzz_target_1"
